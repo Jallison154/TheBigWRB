@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+import os, glob, time, random, sys, serial
+
+# ALSA device (you’re on card0)
+os.environ.setdefault("SDL_AUDIODRIVER","alsa")
+os.environ.setdefault("AUDIODEV","plughw:0,0")
+
+BAUD=115200
+SERIAL=os.getenv("MATT_SFX_SERIAL","/dev/ttyACM0")
+READY_PIN=18
+READY_ACTIVE_LOW=True
+MIX_FREQ=44100
+MIX_BUF=256
+RESCAN_SEC=1.0
+IDLE_SHUTOFF_SEC=1.0   # close audio device this long after last cue
+
+# --- LED (simple on/off, active-low wiring) ---
+from gpiozero import LED
+led=LED(READY_PIN, active_high=(not READY_ACTIVE_LOW))
+
+def usb_mount_dirs():
+    base="/media"
+    return [os.path.join(base,d) for d in sorted(os.listdir(base))
+            if os.path.isdir(os.path.join(base,d)) and os.path.ismount(os.path.join(base,d))] if os.path.isdir(base) else []
+
+def pick_source():
+    for mnt in usb_mount_dirs():
+        R=sorted(glob.glob(os.path.join(mnt,"right*.wav")))
+        W=sorted(glob.glob(os.path.join(mnt,"wrong*.wav")))
+        if R or W: return (f"USB:{mnt}", R[:1], W)
+    local=os.path.expanduser("~/mattsfx"); os.makedirs(local, exist_ok=True)
+    R=sorted(glob.glob(os.path.join(local,"right*.wav")))
+    W=sorted(glob.glob(os.path.join(local,"wrong*.wav")))
+    return ("LOCAL", R[:1], W)
+
+def classify(s):
+    u=s.strip().upper()
+    if u=="R" or "RIGHT" in u or "BTN1" in u or "BTN_R" in u: return 'R'
+    if u=="W" or "WRONG" in u or "BTN2" in u or "BTN_W" in u: return 'W'
+    return None
+
+# --- on-demand audio helpers (no background output) ---
+_mixer_ready=False
+_last_play=0
+_right_paths=[]; _wrong_paths=[]
+
+def set_paths(R, W):
+    global _right_paths, _wrong_paths
+    _right_paths, _wrong_paths = R, W
+
+def ensure_mixer():
+    global _mixer_ready
+    if _mixer_ready: return
+    import pygame
+    for i in range(8):
+        try:
+            pygame.mixer.init(frequency=MIX_FREQ,size=-16,channels=2,buffer=MIX_BUF)
+            _mixer_ready=True
+            print("[mattsfx] audio: mixer ready", flush=True)
+            return
+        except Exception as e:
+            print(f"[mattsfx] audio init retry {i+1}: {e}", flush=True); time.sleep(0.2)
+    raise SystemExit("audio init failed")
+
+def shutdown_mixer_if_idle():
+    global _mixer_ready
+    if not _mixer_ready: return
+    import pygame
+    if (time.time()-_last_play) > IDLE_SHUTOFF_SEC and not pygame.mixer.get_busy():
+        pygame.mixer.quit()
+        _mixer_ready=False
+        print("[mattsfx] audio: mixer closed (idle)", flush=True)
+
+def play_right():
+    global _last_play
+    if not _right_paths: 
+        print("[mattsfx] RIGHT (no file)", flush=True); return
+    ensure_mixer()
+    import pygame
+    s = pygame.mixer.Sound(_right_paths[0])
+    pygame.mixer.Channel(0).play(s)
+    _last_play=time.time()
+
+def play_wrong():
+    global _last_play
+    if not _wrong_paths:
+        print("[mattsfx] WRONG (no files)", flush=True); return
+    ensure_mixer()
+    import pygame
+    s = pygame.mixer.Sound(random.choice(_wrong_paths))
+    pygame.mixer.Channel(1).play(s)
+    _last_play=time.time()
+# ------------------------------------------------------
+
+def wait_serial():
+    print("[mattsfx] waiting for serial…", flush=True)
+    prefs=[SERIAL,"/dev/ttyACM0","/dev/ttyACM1","/dev/ttyUSB0","/dev/ttyUSB1","/dev/serial0","/dev/ttyAMA0","/dev/ttyS0"]
+    while True:
+        for p in prefs:
+            try: return serial.Serial(p, BAUD, timeout=0.1)
+            except: pass
+        time.sleep(0.3)
+
+def main():
+    led.off()  # OFF until ready
+
+    # source scan + initial paths (no mixer init yet)
+    tag, R, W = pick_source()
+    set_paths(R, W)
+    print(f"[mattsfx] source={tag} right={R[:1]} wrongs={len(W)}", flush=True)
+
+    ser=wait_serial()
+    print(f"[mattsfx] serial: {ser.port}", flush=True)
+
+    led.on(); print("[mattsfx] READY", flush=True)
+    last_scan=time.time()
+
+    while True:
+        # hot-swap (update file paths only)
+        if time.time()-last_scan > RESCAN_SEC:
+            ntag, nR, nW = pick_source()
+            if (ntag!=tag) or (nR!=R) or (nW!=W):
+                tag, R, W = ntag, nR, nW
+                set_paths(R, W)
+                print(f"[mattsfx] reloaded: source={tag} right={R[:1]} wrongs={len(W)}", flush=True)
+            last_scan=time.time()
+
+        # read serial and play
+        try: line=ser.readline().decode(errors="ignore")
+        except Exception: time.sleep(0.05); continue
+        if not line: 
+            shutdown_mixer_if_idle()
+            continue
+
+        t=classify(line)
+        if t=='R':
+            print("[mattsfx] RIGHT", flush=True)
+            play_right()
+            try: led.off(); time.sleep(0.04); led.on()
+            except: pass
+        elif t=='W':
+            print("[mattsfx] WRONG", flush=True)
+            play_wrong()
+            try: led.off(); time.sleep(0.04); led.on()
+            except: pass
+
+        shutdown_mixer_if_idle()
+
+if __name__=="__main__":
+    main()
+PY

@@ -1,0 +1,27 @@
+[Unit]
+Description=ESP32 Wireless Button System - Enhanced Sound Effects
+After=network.target sound.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/mattsfx
+Environment=MATT_SFX_SERIAL=/dev/ttyACM0
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/pi/mattsfx/Pi_Script_Enhanced.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Audio permissions
+SupplementaryGroups=audio
+
+# Keep running even if serial port is disconnected
+KillMode=mixed
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

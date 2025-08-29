@@ -1,11 +1,11 @@
 # ESP32 Wireless Button System
 
-A battery-efficient wireless button system using ESP32 devices with ESP-NOW protocol. The system consists of transmitters (with buttons) and a receiver that processes button presses.
+A battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** devices with ESP-NOW protocol. The system consists of transmitters (with buttons) and a receiver that processes button presses.
 
 ## System Overview
 
-- **Transmitters**: ESP32 devices with buttons that send button press events wirelessly
-- **Receiver**: ESP32 device that receives button presses and can trigger actions
+- **Transmitters**: Seeed Studio XIAO ESP32C3 devices with buttons that send button press events wirelessly
+- **Receiver**: Seeed Studio XIAO ESP32C3 device that receives button presses and can trigger actions
 - **Protocol**: ESP-NOW for low-latency, direct communication
 - **Power Management**: Advanced sleep modes for extended battery life
 - **Security**: MAC address-based authentication to ensure devices only communicate with authorized partners
@@ -15,6 +15,7 @@ A battery-efficient wireless button system using ESP32 devices with ESP-NOW prot
 - `Transmitter_ESP32.ino` - Transmitter code (for button devices)
 - `Receiver ESP32` - Receiver code (for central device)
 - `Transmitter ESP32.c` - Original transmitter file (legacy)
+- `MAC_Finder.ino` - Utility to find device MAC addresses
 
 ## Key Improvements Made
 
@@ -51,15 +52,22 @@ A battery-efficient wireless button system using ESP32 devices with ESP-NOW prot
 ## Hardware Setup
 
 ### Transmitter
-- ESP32 development board
-- 2 buttons connected to D1 and D2 (to GND)
-- Status LED on D10
-- Power supply (battery recommended for portability)
+- **Board**: Seeed Studio XIAO ESP32C3
+- **Buttons**: 2 buttons connected to D1 and D2 (to GND)
+- **Status LED**: On D10
+- **Power**: Battery recommended for portability (3.3V)
 
 ### Receiver
-- ESP32 development board
-- Status LED on D10
-- Power supply (USB or battery)
+- **Board**: Seeed Studio XIAO ESP32C3
+- **Status LED**: On D10
+- **Power**: USB or battery (3.3V)
+
+### Pin Connections
+- `LED_PIN`: D10 (status LED)
+- `BTN1_PIN`: D1 (button 1)
+- `BTN2_PIN`: D2 (button 2)
+
+**Note**: The XIAO ESP32C3 uses the Dx pin aliases which map to the actual GPIO pins on the board.
 
 ## Configuration
 
@@ -68,7 +76,14 @@ A battery-efficient wireless button system using ESP32 devices with ESP-NOW prot
 **IMPORTANT**: You must configure the correct MAC addresses for your devices to communicate.
 
 #### Step 1: Find Your Device MAC Addresses
-1. Flash a simple sketch to each ESP32 to print its MAC address:
+1. Use the included `MAC_Finder.ino` sketch to find your device MAC addresses:
+   - Open `MAC_Finder.ino` in Arduino IDE
+   - Select your board (XIAO_ESP32C3)
+   - Upload the sketch
+   - Open Serial Monitor (115200 baud)
+   - The MAC address will be displayed in the correct format for copying to your code
+
+Alternatively, you can use this simple sketch:
 ```cpp
 #include <WiFi.h>
 void setup() {
@@ -105,11 +120,27 @@ uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // Your receiver MAC
 
 ## Usage
 
+### Arduino IDE Setup
+1. **Install ESP32 Board Package**:
+   - Open Arduino IDE
+   - Go to File → Preferences
+   - Add this URL to "Additional Board Manager URLs": `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
+   - Go to Tools → Board → Board Manager
+   - Search for "ESP32" and install "ESP32 by Espressif Systems"
+
+2. **Select Board**:
+   - Tools → Board → ESP32 Arduino → XIAO_ESP32C3
+   - Set Upload Speed to 921600
+   - Set CPU Frequency to 160MHz
+   - Set Flash Frequency to 80MHz
+   - Set Flash Mode to QIO
+   - Set Flash Size to 4MB
+
 ### Flashing the Code
-1. **First**: Find your device MAC addresses using the simple sketch above
+1. **First**: Find your device MAC addresses using the `MAC_Finder.ino` sketch
 2. **Second**: Update the MAC addresses in both files
-3. **Third**: Flash `Transmitter_ESP32.ino` to your transmitter ESP32
-4. **Fourth**: Flash `Receiver ESP32` to your receiver ESP32
+3. **Third**: Flash `Transmitter_ESP32.ino` to your transmitter XIAO ESP32C3
+4. **Fourth**: Flash `Receiver ESP32` to your receiver XIAO ESP32C3
 
 ### Operation
 1. **Transmitter**: Press buttons to send events to receiver
@@ -226,3 +257,85 @@ case MSG_BTN:
 ## License
 
 This project is open source. Feel free to modify and distribute as needed.
+
+## Raspberry Pi Integration
+
+### Enhanced Pi Script
+
+The system includes an enhanced Raspberry Pi script that works seamlessly with the ESP32 receiver to play sound effects based on button presses.
+
+#### Features:
+- **ESP32 Message Parsing**: Automatically detects and parses ESP32 button messages
+- **Audio Playback**: Plays different sounds for correct/incorrect answers
+- **USB Hot-Swapping**: Automatically detects and uses sound files from USB drives
+- **Logging**: Comprehensive logging of all button presses and system events
+- **LED Feedback**: Visual feedback when buttons are pressed
+- **Auto-Restart**: Automatically restarts if the ESP32 connection is lost
+- **Systemd Service**: Runs as a system service that starts on boot
+
+#### Installation:
+
+1. **Copy the enhanced files to your Pi:**
+   ```bash
+   # Copy these files to your Raspberry Pi:
+   # - Pi_Script_Enhanced.py
+   # - mattsfx-enhanced.service
+   # - install_enhanced.sh
+   ```
+
+2. **Run the installation script:**
+   ```bash
+   chmod +x install_enhanced.sh
+   ./install_enhanced.sh
+   ```
+
+3. **Connect your ESP32 receiver:**
+   - Connect the ESP32 receiver to the Pi via USB
+   - The service will automatically detect and connect to it
+
+#### Usage:
+
+1. **Sound Files**: Place your sound files in `~/mattsfx/sounds/`
+   - `right1.wav`, `right2.wav`, etc. for correct answers
+   - `wrong1.wav`, `wrong2.wav`, etc. for incorrect answers
+   - Or use a USB drive with `right*.wav` and `wrong*.wav` files
+
+2. **Button Mapping**:
+   - **Button 1** (D1) → Plays "right" sound
+   - **Button 2** (D2) → Plays "wrong" sound
+
+3. **Monitoring**:
+   ```bash
+   # Check service status
+   sudo systemctl status mattsfx-enhanced.service
+   
+   # View real-time logs
+   sudo journalctl -u mattsfx-enhanced.service -f
+   
+   # View button press history
+   tail -f ~/mattsfx/button_log.txt
+   ```
+
+#### Configuration:
+
+The script automatically detects:
+- ESP32 serial connection (tries multiple ports)
+- Sound files from USB drives or local storage
+- LED feedback on GPIO pin 18
+
+You can customize the configuration by editing the variables at the top of `Pi_Script_Enhanced.py`:
+```python
+BAUD = 115200                    # Serial baud rate
+SERIAL = "/dev/ttyACM0"          # Default serial port
+READY_PIN = 18                   # LED pin
+LOG_FILE = "/home/pi/mattsfx/button_log.txt"  # Log file location
+```
+
+#### Troubleshooting:
+
+1. **No Sound**: Check audio permissions and pygame installation
+2. **No Serial Connection**: Verify ESP32 is connected and check serial port
+3. **Service Won't Start**: Check logs with `sudo journalctl -u mattsfx-enhanced.service`
+4. **Permission Errors**: Ensure pi user is in the audio group
+
+The enhanced Pi script provides a complete, production-ready solution for integrating your ESP32 wireless button system with audio feedback on a Raspberry Pi.
