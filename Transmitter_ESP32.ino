@@ -14,7 +14,7 @@ const bool USE_BTN2 = true;
 const bool BTN_ACTIVE_LOW = true;  // true = button to GND with INPUT_PULLUP
 
 // ---------- Peer (Receiver) MAC ----------
-uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // <-- your RX MAC
+uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // <-- your RX MAC (this should be the receiver's MAC)
 
 // ---------- Messages ----------
 enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0 };
@@ -97,6 +97,15 @@ void ledTask(){
 // ---------- ESP-NOW handlers ----------
 void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len){
   if (!data || len <= 0) return;
+  
+  // Only accept messages from the authorized receiver
+  if (memcmp(info->src_addr, RX_MAC, 6) != 0) {
+    Serial.printf("Rejected message from unauthorized MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                 info->src_addr[0], info->src_addr[1], info->src_addr[2],
+                 info->src_addr[3], info->src_addr[4], info->src_addr[5]);
+    return;
+  }
+  
   if (data[0] == MSG_ACK){
     lastAckMs = millis();  // link health only (DO NOT touch lastActivityMs)
   }
@@ -114,7 +123,7 @@ void sendPing(){
   uint8_t m = MSG_PING;
   esp_err_t result = esp_now_send(RX_MAC, &m, 1);
   if (result != ESP_OK) {
-    Serial.println("TX: Ping failed to send");
+    Serial.printf("TX: Ping failed to send (error: %d)\n", result);
   }
 }
 
@@ -125,10 +134,11 @@ void sendBtn(uint8_t id){
   for (uint8_t retry = 0; retry < MAX_RETRIES; retry++) {
     esp_err_t result = esp_now_send(RX_MAC, m, sizeof(m));
     if (result == ESP_OK) {
-      Serial.printf("TX: BTN%u pressed (local) - sent\n", id);
+      Serial.printf("TX: BTN%u pressed (local) - sent successfully\n", id);
       lastActivityMs = millis(); // reset idle timer on local activity
       return;
     }
+    Serial.printf("TX: BTN%u send attempt %d failed (error: %d)\n", id, retry + 1, result);
     if (retry < MAX_RETRIES - 1) {
       delay(RETRY_DELAY_MS);
     }
@@ -181,7 +191,10 @@ void setup(){
   Serial.begin(115200);
   delay(150);
 
+  Serial.printf("Transmitter starting...\n");
   Serial.printf("Pins: D1=%d, D2=%d, D10=%d\n", D1, D2, D10);
+  Serial.printf("Receiver MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+               RX_MAC[0], RX_MAC[1], RX_MAC[2], RX_MAC[3], RX_MAC[4], RX_MAC[5]);
   Serial.printf("Wake cause: %d (GPIO=%d, Timer=%d)\n",
                 (int)wakeCause, (int)ESP_SLEEP_WAKEUP_GPIO, (int)ESP_SLEEP_WAKEUP_TIMER);
 
@@ -211,6 +224,7 @@ void setup(){
   addPeer(RX_MAC, 1);
 
   lastActivityMs = millis(); // start idle timer
+  Serial.println("Transmitter ready! Only accepting messages from authorized receiver.");
 }
 
 // ---------- Loop ----------

@@ -2,71 +2,49 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <esp_sleep.h>
-#include "driver/gpio.h"   // <-- needed for gpio_wakeup_enable()
+#include "driver/gpio.h"
 
 // ---------- Pins (use Dx aliases) ----------
 #define LED_PIN  D10               // status LED on header D10
 const bool LED_ACTIVE_LOW = false; // set true if LED looks inverted
 
-#define BTN1_PIN D1                // button 1 on header D1 -> GND
-#define BTN2_PIN D2                // button 2 on header D2 -> GND
-const bool USE_BTN2 = true;
-const bool BTN_ACTIVE_LOW = true;  // true = button to GND with INPUT_PULLUP
-
-// ---------- Peer (Receiver) MAC ----------
-uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // <-- your RX MAC
+// ---------- Allowed Transmitter MACs (only these will be accepted) ----------
+uint8_t ALLOWED_TX_MACS[][6] = {
+  { 0x58,0x8C,0x81,0x9F,0x22,0xAC }, // <-- your TX1 MAC
+  // Add more allowed transmitters as needed
+};
+const uint8_t NUM_ALLOWED_TXS = sizeof(ALLOWED_TX_MACS) / 6;
 
 // ---------- Messages ----------
 enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0 };
 
-// ---------- Link / timing ----------
-uint32_t lastAckMs = 0;
-bool linked = false;
-
-// ---------- Power policy ----------
-const bool     ENABLE_SLEEP     = true;
-// go to LIGHT sleep at 5 min idle, DEEP sleep at 15 min idle
-const uint32_t IDLE_LIGHT_MS    = 5UL  * 60UL * 1000UL;  // 5 minutes
-const uint32_t IDLE_DEEP_MS     = 15UL * 60UL * 1000UL;  // 15 minutes
-uint32_t lastActivityMs         = 0;
-
-// Light-sleep breathing parameters
-const uint32_t BREATH_PERIOD_MS = 2000;   // 2s up/down
-const uint8_t  BREATH_MAX_RAW   = 51;     // ~20% of 255
-
-// Wake cause (for logging only; we do NOT send on deep wake anymore)
-esp_sleep_wakeup_cause_t wakeCause = ESP_SLEEP_WAKEUP_UNDEFINED;
-
-// ---------- Button debouncer ----------
-struct BtnDeb {
-  uint8_t pin;
-  bool activeLow;
-  int lastLevel;
-  uint32_t lastFlip;
-  bool armed;
+// ---------- Link tracking ----------
+struct TxLink {
+  uint8_t mac[6];
+  uint32_t lastPingMs;
+  bool linked;
+  uint8_t lastBtn1State;
+  uint8_t lastBtn2State;
 };
-const uint16_t DEBOUNCE_MS = 40;
-BtnDeb b1{BTN1_PIN, BTN_ACTIVE_LOW, HIGH, 0, true};
-BtnDeb b2{BTN2_PIN, BTN_ACTIVE_LOW, HIGH, 0, true};
+TxLink txLinks[10]; // Support up to 10 transmitters
+uint8_t numTxLinks = 0;
 
-bool pressEvent(BtnDeb& b){
-  int lvl = digitalRead(b.pin);
-  uint32_t now = millis();
-  if (lvl != b.lastLevel){ b.lastLevel = lvl; b.lastFlip = now; }
-  bool active = b.activeLow ? (lvl==LOW) : (lvl==HIGH);
-  if (!active){ b.armed = true; return false; }
-  if (b.armed && (now - b.lastFlip) > DEBOUNCE_MS){ b.armed = false; return true; }
+// ---------- Button state tracking ----------
+uint32_t lastBtnActivityMs = 0;
+
+// ---------- MAC validation helper ----------
+bool isAllowedTransmitter(const uint8_t* mac) {
+  for (uint8_t i = 0; i < NUM_ALLOWED_TXS; i++) {
+    if (memcmp(ALLOWED_TX_MACS[i], mac, 6) == 0) {
+      return true;
+    }
+  }
   return false;
-}
-
-bool isBtnActive(uint8_t pin){
-  int lvl = digitalRead(pin);
-  return BTN_ACTIVE_LOW ? (lvl == LOW) : (lvl == HIGH);
 }
 
 // ---------- LED helpers ----------
 inline void ledWriteRaw(uint8_t v){ if(LED_ACTIVE_LOW) v = 255 - v; analogWrite(LED_PIN, v); }
-inline void ledOn(){     ledWriteRaw(255); } // 100% when a button is held
+inline void ledOn(){     ledWriteRaw(255); } // 100% when button received
 inline void ledLinked(){ ledWriteRaw(64);  } // ~25% when linked
 inline void ledOff(){    ledWriteRaw(0);   } // off
 
@@ -80,104 +58,135 @@ void showNoLinkDoubleBlink(uint32_t now){
 
 void ledTask(){
   uint32_t now = millis();
-  bool anyLocalHeld = isBtnActive(BTN1_PIN) || (USE_BTN2 && isBtnActive(BTN2_PIN));
-  if (anyLocalHeld) {
-    ledOn();               // 100% while a button is held
-  } else if (linked) {
+  bool anyLinked = false;
+  bool recentActivity = (now - lastBtnActivityMs) < 1000; // 1 second after button press
+  
+  // Check if any transmitters are linked
+  for (uint8_t i = 0; i < numTxLinks; i++) {
+    if (txLinks[i].linked) {
+      anyLinked = true;
+      break;
+    }
+  }
+  
+  if (recentActivity) {
+    ledOn();               // 100% when button activity received
+  } else if (anyLinked) {
     ledLinked();           // 25% when linked
   } else {
-    showNoLinkDoubleBlink(now);
+    showNoLinkDoubleBlink(now);  // Double blink when no links (same as transmitter)
+  }
+}
+
+// ---------- ESP-NOW helper functions ----------
+void addPeer(const uint8_t mac[6], uint8_t channel=1){
+  esp_now_peer_info_t p{};
+  memcpy(p.peer_addr, mac, 6);
+  p.channel = channel; 
+  p.encrypt = false; 
+  p.ifidx = WIFI_IF_STA;
+  esp_now_del_peer(mac);
+  esp_now_add_peer(&p);
+}
+
+void sendAck(const uint8_t* mac) {
+  uint8_t ack = MSG_ACK;
+  esp_err_t result = esp_now_send(mac, &ack, 1);
+  if (result != ESP_OK) {
+    Serial.printf("Failed to send ACK to %02X:%02X:%02X:%02X:%02X:%02X\n",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   }
 }
 
 // ---------- ESP-NOW handlers ----------
 void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len){
   if (!data || len <= 0) return;
-  if (data[0] == MSG_ACK){
-    lastAckMs = millis();  // link health only (DO NOT touch lastActivityMs)
+  
+  // Only accept messages from allowed transmitters
+  if (!isAllowedTransmitter(info->src_addr)) {
+    Serial.printf("Rejected message from unauthorized MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                 info->src_addr[0], info->src_addr[1], info->src_addr[2],
+                 info->src_addr[3], info->src_addr[4], info->src_addr[5]);
+    return;
   }
-}
-
-void addPeer(const uint8_t mac[6], uint8_t channel=1){
-  esp_now_peer_info_t p{};
-  memcpy(p.peer_addr, mac, 6);
-  p.channel = channel; p.encrypt = false; p.ifidx = WIFI_IF_STA;
-  esp_now_del_peer(mac);
-  esp_now_add_peer(&p);
-}
-
-void sendPing(){
-  uint8_t m = MSG_PING;
-  esp_now_send(RX_MAC, &m, 1);
-}
-
-void sendBtn(uint8_t id){
-  uint8_t m[2] = { MSG_BTN, id };
-  esp_now_send(RX_MAC, m, sizeof(m));
-  Serial.printf("TX: BTN%u pressed (local)\n", id);
-  lastActivityMs = millis(); // reset idle timer on local activity
-}
-
-// ---------- Sleep helpers ----------
-// Light sleep: enable GPIO wake on LOW using the new API pattern (IDF v5).
-void enableGpioWakeLow_Light(){
-  gpio_wakeup_enable((gpio_num_t)BTN1_PIN, GPIO_INTR_LOW_LEVEL);
-  if (USE_BTN2) gpio_wakeup_enable((gpio_num_t)BTN2_PIN, GPIO_INTR_LOW_LEVEL);
-  esp_sleep_enable_gpio_wakeup(); // no args in IDF v5
-}
-
-// Deep sleep: keep using mask+level helper (still valid).
-uint64_t gpioWakeMask(){
-  uint64_t mask = (1ULL << BTN1_PIN);
-  if (USE_BTN2) mask |= (1ULL << BTN2_PIN);
-  return mask;
-}
-void enableGpioWakeLow_Deep(){
-  esp_deep_sleep_disable_rom_logging(); // optional: quieter boot logs
-  esp_deep_sleep_enable_gpio_wakeup(gpioWakeMask(), ESP_GPIO_WAKEUP_GPIO_LOW);
-}
-
-void goToDeepSleep(){
-  Serial.println("Entering DEEP sleep… (wake on D1/D2 LOW)");
-  ledOff();
-  pinMode(BTN1_PIN, INPUT_PULLUP);
-  if (USE_BTN2) pinMode(BTN2_PIN, INPUT_PULLUP);
-  enableGpioWakeLow_Deep();
-  esp_deep_sleep_start();
-}
-
-// One light-sleep “tick”: sleeps ~50 ms with GPIO+timer wake, returns cause.
-esp_sleep_wakeup_cause_t lightSleepTick(uint64_t us){
-  pinMode(BTN1_PIN, INPUT_PULLUP);
-  if (USE_BTN2) pinMode(BTN2_PIN, INPUT_PULLUP);
-
-  enableGpioWakeLow_Light();
-  esp_sleep_enable_timer_wakeup(us);
-  return (esp_sleep_wakeup_cause_t) esp_light_sleep_start();
+  
+  // Find or create transmitter link
+  uint8_t txIndex = 255;
+  for (uint8_t i = 0; i < numTxLinks; i++) {
+    if (memcmp(txLinks[i].mac, info->src_addr, 6) == 0) {
+      txIndex = i;
+      break;
+    }
+  }
+  
+  if (txIndex == 255 && numTxLinks < 10) {
+    txIndex = numTxLinks++;
+    memcpy(txLinks[txIndex].mac, info->src_addr, 6);
+    txLinks[txIndex].linked = false;
+    txLinks[txIndex].lastPingMs = 0;
+    txLinks[txIndex].lastBtn1State = 0;
+    txLinks[txIndex].lastBtn2State = 0;
+    
+    // Add this transmitter as a peer automatically
+    addPeer(info->src_addr, 1);
+    Serial.printf("Authorized transmitter connected: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                 info->src_addr[0], info->src_addr[1], info->src_addr[2],
+                 info->src_addr[3], info->src_addr[4], info->src_addr[5]);
+  }
+  
+  if (txIndex == 255) return; // Too many transmitters
+  
+  uint32_t now = millis();
+  
+  switch (data[0]) {
+    case MSG_PING:
+      // Send ACK back
+      sendAck(info->src_addr);
+      txLinks[txIndex].lastPingMs = now;
+      txLinks[txIndex].linked = true;
+      break;
+      
+    case MSG_BTN:
+      if (len >= 2) {
+        uint8_t btnId = data[1];
+        Serial.printf("RX: BTN%u from %02X:%02X:%02X:%02X:%02X:%02X\n", 
+                     btnId, info->src_addr[0], info->src_addr[1], info->src_addr[2],
+                     info->src_addr[3], info->src_addr[4], info->src_addr[5]);
+        
+        // Update button states for this transmitter
+        if (btnId == 1) {
+          txLinks[txIndex].lastBtn1State = 1;
+        } else if (btnId == 2) {
+          txLinks[txIndex].lastBtn2State = 1;
+        }
+        lastBtnActivityMs = now;
+        
+        // Send ACK back
+        sendAck(info->src_addr);
+      }
+      break;
+  }
 }
 
 // ---------- Setup ----------
 void setup(){
-  wakeCause = esp_sleep_get_wakeup_cause();
-
   Serial.begin(115200);
   delay(150);
 
-  Serial.printf("Pins: D1=%d, D2=%d, D10=%d\n", D1, D2, D10);
-  Serial.printf("Wake cause: %d (GPIO=%d, Timer=%d)\n",
-                (int)wakeCause, (int)ESP_SLEEP_WAKEUP_GPIO, (int)ESP_SLEEP_WAKEUP_TIMER);
+  Serial.printf("Receiver starting...\n");
+  Serial.printf("LED Pin: D10=%d\n", D10);
+  Serial.printf("Allowed transmitters: %d\n", NUM_ALLOWED_TXS);
+  for (uint8_t i = 0; i < NUM_ALLOWED_TXS; i++) {
+    Serial.printf("  TX%d: %02X:%02X:%02X:%02X:%02X:%02X\n", i+1,
+                 ALLOWED_TX_MACS[i][0], ALLOWED_TX_MACS[i][1], ALLOWED_TX_MACS[i][2],
+                 ALLOWED_TX_MACS[i][3], ALLOWED_TX_MACS[i][4], ALLOWED_TX_MACS[i][5]);
+  }
 
   // LED PWM
   pinMode(LED_PIN, OUTPUT);
   analogWriteResolution(LED_PIN, 8);     // 0..255
   analogWriteFrequency(LED_PIN, 2000);   // Hz
   ledOff();
-
-  // Buttons
-  pinMode(BTN1_PIN, INPUT_PULLUP);
-  if (USE_BTN2) pinMode(BTN2_PIN, INPUT_PULLUP);
-  b1.lastLevel = digitalRead(BTN1_PIN);
-  if (USE_BTN2) b2.lastLevel = digitalRead(BTN2_PIN);
 
   // WiFi/ESP-NOW init
   WiFi.mode(WIFI_STA);
@@ -190,55 +199,32 @@ void setup(){
     while(true){ ledOn(); delay(120); ledOff(); delay(600); }
   }
   esp_now_register_recv_cb(onRecv);
-  addPeer(RX_MAC, 1);
-
-  lastActivityMs = millis(); // start idle timer
+  
+  Serial.println("Receiver ready! Only accepting authorized transmitters.");
 }
 
 // ---------- Loop ----------
 void loop(){
   uint32_t now = millis();
-  linked = (now - lastAckMs) < 4000;
-
-  // If we’re before 5 min idle: normal active mode
-  if (ENABLE_SLEEP && (now - lastActivityMs) < IDLE_LIGHT_MS){
-    if (pressEvent(b1)) sendBtn(1);
-    if (USE_BTN2 && pressEvent(b2)) sendBtn(2);
-
-    static uint32_t lastPing = 0;
-    if (now - lastPing >= 500){ lastPing = now; sendPing(); }
-
-    ledTask();
-    delay(1);
-    return;
+  
+  // Update link status (4 second timeout)
+  for (uint8_t i = 0; i < numTxLinks; i++) {
+    txLinks[i].linked = (now - txLinks[i].lastPingMs) < 4000;
   }
-
-  // Between 5 and 15 minutes idle: breathing + light-sleep bursts
-  if (ENABLE_SLEEP && (now - lastActivityMs) < IDLE_DEEP_MS){
-    // If user presses during this phase, send immediately
-    if (isBtnActive(BTN1_PIN)) { sendBtn(1); return; }
-    if (USE_BTN2 && isBtnActive(BTN2_PIN)) { sendBtn(2); return; }
-
-    // Breathing LED 0..20%
-    uint32_t t = (now - lastActivityMs) % BREATH_PERIOD_MS;
-    uint32_t half = BREATH_PERIOD_MS / 2;
-    uint8_t val = (t < half)
-                  ? (uint8_t)((BREATH_MAX_RAW * t) / half)
-                  : (uint8_t)((BREATH_MAX_RAW * (BREATH_PERIOD_MS - t)) / half);
-    ledWriteRaw(val);
-
-    // Short light-sleep “tick”
-    esp_sleep_wakeup_cause_t cause = lightSleepTick(50000ULL); // 50 ms
-    if (cause == ESP_SLEEP_WAKEUP_GPIO){
-      delay(20); // settle
-      if (isBtnActive(BTN1_PIN)) { sendBtn(1); return; }
-      if (USE_BTN2 && isBtnActive(BTN2_PIN)) { sendBtn(2); return; }
+  
+  // Update LED
+  ledTask();
+  
+  // Print status every 10 seconds
+  static uint32_t lastStatusMs = 0;
+  if (now - lastStatusMs >= 10000) {
+    lastStatusMs = now;
+    uint8_t linkedCount = 0;
+    for(uint8_t i = 0; i < numTxLinks; i++) {
+      if(txLinks[i].linked) linkedCount++;
     }
-    return;
+    Serial.printf("Status: %d transmitters, %d linked\n", numTxLinks, linkedCount);
   }
-
-  // >= 15 minutes idle: DEEP SLEEP
-  if (ENABLE_SLEEP && (now - lastActivityMs) >= IDLE_DEEP_MS){
-    goToDeepSleep(); // does not return
-  }
+  
+  delay(10);
 }
