@@ -227,13 +227,8 @@ void loop(){
                   : (uint8_t)((BREATH_MAX_RAW * (BREATH_PERIOD_MS - t)) / half);
     ledWriteRaw(val);
 
-    // Short light-sleep “tick”
-    esp_sleep_wakeup_cause_t cause = lightSleepTick(50000ULL); // 50 ms
-    if (cause == ESP_SLEEP_WAKEUP_GPIO){
-      delay(20); // settle
-      if (isBtnActive(BTN1_PIN)) { sendBtn(1); return; }
-      if (USE_BTN2 && isBtnActive(BTN2_PIN)) { sendBtn(2); return; }
-    }
+    // Use shorter delay for smoother breathing animation
+    delay(20); // 20ms delay for smooth animation
     return;
   }
 
