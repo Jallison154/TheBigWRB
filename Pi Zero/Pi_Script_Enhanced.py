@@ -11,7 +11,9 @@ from datetime import datetime
 BAUD = 115200
 SERIAL = os.getenv("MATT_SFX_SERIAL", "/dev/ttyACM0")
 READY_PIN = 18
+USB_LED_PIN = 23  # New LED for USB drive status
 READY_ACTIVE_LOW = True
+USB_LED_ACTIVE_LOW = True  # USB LED also active-low
 MIX_FREQ = 44100
 MIX_BUF = 256
 RESCAN_SEC = 1.0
@@ -27,10 +29,17 @@ MSG_BTN = 0xB0
 try:
     from gpiozero import LED
     led = LED(READY_PIN, active_high=(not READY_ACTIVE_LOW))
+    usb_led = LED(USB_LED_PIN, active_high=(not USB_LED_ACTIVE_LOW))
     LED_AVAILABLE = True
+    USB_LED_AVAILABLE = True
 except ImportError:
     print("[mattsfx] Warning: gpiozero not available, LED disabled")
     LED_AVAILABLE = False
+    USB_LED_AVAILABLE = False
+except Exception as e:
+    print(f"[mattsfx] Warning: LED initialization failed: {e}")
+    LED_AVAILABLE = False
+    USB_LED_AVAILABLE = False
 
 def log_event(message):
     """Log events to file with timestamp"""
@@ -54,10 +63,26 @@ def usb_mount_dirs():
             mounts.append(path)
     return mounts
 
+def update_usb_led(mounts):
+    """Update USB LED based on mount status"""
+    if not USB_LED_AVAILABLE:
+        return
+    
+    try:
+        if mounts:
+            usb_led.on()  # USB drive is mounted
+        else:
+            usb_led.off()  # No USB drive mounted
+    except Exception as e:
+        print(f"[mattsfx] USB LED control failed: {e}", flush=True)
+
 def pick_source():
     """Find sound files from USB or local storage"""
     # Check USB drives first
-    for mnt in usb_mount_dirs():
+    mounts = usb_mount_dirs()
+    update_usb_led(mounts)  # Update USB LED status
+    
+    for mnt in mounts:
         R = sorted(glob.glob(os.path.join(mnt, "right*.wav")))
         W = sorted(glob.glob(os.path.join(mnt, "wrong*.wav")))
         if R or W:
@@ -225,6 +250,8 @@ def main():
     """Main function"""
     if LED_AVAILABLE:
         led.off()  # OFF until ready
+    if USB_LED_AVAILABLE:
+        usb_led.off()  # USB LED OFF initially
     
     print("[mattsfx] ESP32 Wireless Button System - Enhanced Pi Script", flush=True)
     log_event("Pi script started")
@@ -330,9 +357,13 @@ if __name__ == "__main__":
         log_event("Script stopped by user")
         if LED_AVAILABLE:
             led.off()
+        if USB_LED_AVAILABLE:
+            usb_led.off()
     except Exception as e:
         print(f"[mattsfx] Fatal error: {e}", flush=True)
         log_event(f"Fatal error: {e}")
         if LED_AVAILABLE:
             led.off()
+        if USB_LED_AVAILABLE:
+            usb_led.off()
         sys.exit(1)
