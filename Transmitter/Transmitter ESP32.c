@@ -14,7 +14,7 @@ const bool USE_BTN2 = true;
 const bool BTN_ACTIVE_LOW = true;  // true = button to GND with INPUT_PULLUP
 
 // ---------- Peer (Receiver) MAC ----------
-uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // <-- your RX MAC
+uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // <-- your RX MAC (58:8c:81:9e:30:10)
 
 // ---------- Messages ----------
 enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0 };
@@ -237,7 +237,7 @@ void loop(){
     if (isBtnActive(BTN1_PIN)) { sendBtn(1); return; }
     if (USE_BTN2 && isBtnActive(BTN2_PIN)) { sendBtn(2); return; }
 
-    // Breathing LED 0..20%
+    // Breathing LED 0..20% - smoother calculation
     uint32_t t = (now - lastActivityMs) % BREATH_PERIOD_MS;
     uint32_t half = BREATH_PERIOD_MS / 2;
     uint8_t val = (t < half)
@@ -245,8 +245,9 @@ void loop(){
                   : (uint8_t)((BREATH_MAX_RAW * (BREATH_PERIOD_MS - t)) / half);
     ledWriteRaw(val);
 
-    // Short light-sleep "tick" for power saving
-    esp_sleep_wakeup_cause_t cause = lightSleepTick(50000ULL); // 50 ms
+    // Use longer sleep periods to reduce flickering
+    // Sleep for 500ms to make breathing pattern smoother
+    esp_sleep_wakeup_cause_t cause = lightSleepTick(500000ULL); // 500 ms
     if (cause == ESP_SLEEP_WAKEUP_GPIO){
       delay(20); // settle
       if (isBtnActive(BTN1_PIN)) { sendBtn(1); return; }

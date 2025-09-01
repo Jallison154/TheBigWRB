@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
 """
-Configuration file for ESP32 Wireless Button System - Enhanced Pi Script
-Modify these settings to customize the behavior
+Configuration file for ESP32 Wireless Button System
+This file documents the MAC addresses and pin configurations used in the system.
 """
 
-# Serial Configuration
-BAUD = 115200
-SERIAL = "/dev/ttyACM0"  # Default serial port, can be overridden by MATT_SFX_SERIAL env var
+# MAC Address Configuration
+# IMPORTANT: These must match between transmitter and receiver
+# 
+# Receiver MAC: 0x58,0x8C,0x81,0x9E,0x30,0x10 (58:8c:81:9e:30:10)
+# Transmitter MAC: 0x58,0x8C,0x81,0x9F,0x22,0xAC (58:8c:81:9f:22:ac)
+#
+# In the Receiver ESP32 code:
+# ALLOWED_TX_MACS[][6] = { { 0x58,0x8C,0x81,0x9F,0x22,0xAC } }; // Transmitter MAC
+#
+# In the Transmitter ESP32 code:
+# RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // Receiver MAC
 
-# LED Configuration
+# Pi Script Configuration
+BAUD = 115200
+SERIAL = "/dev/ttyACM0"
 READY_PIN = 18
+USB_LED_PIN = 23
 READY_ACTIVE_LOW = True
+USB_LED_ACTIVE_LOW = True
 
 # Audio Configuration
 MIX_FREQ = 44100
@@ -20,37 +32,29 @@ IDLE_SHUTOFF_SEC = 1.0
 
 # File Paths
 LOG_FILE = "/home/pi/mattsfx/button_log.txt"
-SOUND_DIR = "/home/pi/mattsfx/sounds"
+HEALTH_LOG = "/home/pi/mattsfx/health_log.txt"
 
-# Button Mapping (which ESP32 button triggers which sound)
-BUTTON_MAPPING = {
-    1: "right",   # Button 1 = Right sound
-    2: "wrong"    # Button 2 = Wrong sound
-}
+# ESP32 Message Types
+MSG_PING = 0xA0
+MSG_ACK = 0xA1
+MSG_BTN = 0xB0
 
-# Sound File Patterns
-RIGHT_PATTERN = "right*.wav"
-WRONG_PATTERN = "wrong*.wav"
+# Hardware Pin Configuration
+# ESP32 Pins (using Dx aliases for XIAO ESP32C3)
+LED_PIN = "D10"           # Status LED
+BTN1_PIN = "D1"           # Button 1
+BTN2_PIN = "D2"           # Button 2
 
-# Logging Configuration
-LOG_BUTTON_PRESSES = True
-LOG_CONNECTIONS = True
-LOG_SECURITY_EVENTS = True
-LOG_AUDIO_EVENTS = True
+# Power Management Settings
+IDLE_LIGHT_MS = 5 * 60 * 1000    # 5 minutes to light sleep
+IDLE_DEEP_MS = 15 * 60 * 1000    # 15 minutes to deep sleep
+MAX_RETRIES = 3                   # Button press retry count
+RETRY_DELAY_MS = 50              # Delay between retries
 
-# Serial Port Detection (tries these ports in order)
-SERIAL_PORTS = [
-    "/dev/ttyACM0",
-    "/dev/ttyACM1", 
-    "/dev/ttyUSB0",
-    "/dev/ttyUSB1",
-    "/dev/serial0",
-    "/dev/ttyAMA0",
-    "/dev/ttyS0"
-]
+# Link Management
+LINK_TIMEOUT_MS = 4000           # 4 second link timeout
+PING_INTERVAL_MS = 500           # 500ms ping interval
+STATUS_INTERVAL_MS = 10000       # 10 second status interval
 
-# USB Mount Directory
-USB_MOUNT_DIR = "/media"
-
-# Debug Mode (set to True for verbose output)
-DEBUG_MODE = False
+# Security
+MAX_TRANSMITTERS = 10            # Maximum number of transmitters

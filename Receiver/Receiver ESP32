@@ -10,7 +10,7 @@ const bool LED_ACTIVE_LOW = false; // set true if LED looks inverted
 
 // ---------- Allowed Transmitter MACs (only these will be accepted) ----------
 uint8_t ALLOWED_TX_MACS[][6] = {
-  { 0x58,0x8C,0x81,0x9F,0x22,0xAC }, // <-- your TX1 MAC
+  { 0x58,0x8C,0x81,0x9F,0x22,0xAC }, // <-- your TX1 MAC (58:8c:81:9f:22:ac)
   // Add more allowed transmitters as needed
 };
 const uint8_t NUM_ALLOWED_TXS = sizeof(ALLOWED_TX_MACS) / 6;

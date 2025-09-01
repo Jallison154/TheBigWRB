@@ -268,6 +268,7 @@ The system includes an enhanced Raspberry Pi script that works seamlessly with t
 - **ESP32 Message Parsing**: Automatically detects and parses ESP32 button messages
 - **Audio Playback**: Plays different sounds for correct/incorrect answers
 - **USB Hot-Swapping**: Automatically detects and uses sound files from USB drives
+- **USB LED Indicator**: Visual indicator showing when USB drives are mounted
 - **Logging**: Comprehensive logging of all button presses and system events
 - **LED Feedback**: Visual feedback when buttons are pressed
 - **Auto-Restart**: Automatically restarts if the ESP32 connection is lost
@@ -322,14 +323,45 @@ The script automatically detects:
 - ESP32 serial connection (tries multiple ports)
 - Sound files from USB drives or local storage
 - LED feedback on GPIO pin 18
+- USB drive status on GPIO pin 23
 
 You can customize the configuration by editing the variables at the top of `Pi_Script_Enhanced.py`:
 ```python
 BAUD = 115200                    # Serial baud rate
 SERIAL = "/dev/ttyACM0"          # Default serial port
-READY_PIN = 18                   # LED pin
+READY_PIN = 18                   # Ready LED pin
+USB_LED_PIN = 23                 # USB drive LED pin
 LOG_FILE = "/home/pi/mattsfx/button_log.txt"  # Log file location
 ```
+
+#### LED Indicators:
+
+The system uses two LEDs for status indication:
+
+1. **Ready LED (GPIO 18)**: 
+   - **ON**: System ready and connected to ESP32
+   - **OFF**: System starting up or disconnected
+   - **Blink**: Button press detected
+
+2. **USB LED (GPIO 23)**:
+   - **ON**: USB drive is mounted
+   - **OFF**: No USB drive mounted
+   - **Blink**: USB drive with sound files detected
+
+#### Testing USB LED:
+
+You can test the USB LED functionality independently using the test script:
+
+```bash
+# Run the USB LED test script
+python3 test_usb_led.py
+```
+
+This script will:
+- Check for mounted USB drives
+- Control the USB LED based on mount status
+- Test sound file detection
+- Provide feedback in simulation mode if gpiozero is not available
 
 #### Troubleshooting:
 
@@ -337,5 +369,6 @@ LOG_FILE = "/home/pi/mattsfx/button_log.txt"  # Log file location
 2. **No Serial Connection**: Verify ESP32 is connected and check serial port
 3. **Service Won't Start**: Check logs with `sudo journalctl -u mattsfx-enhanced.service`
 4. **Permission Errors**: Ensure pi user is in the audio group
+5. **USB LED Not Working**: Check GPIO pin 23 connections and run test script
 
 The enhanced Pi script provides a complete, production-ready solution for integrating your ESP32 wireless button system with audio feedback on a Raspberry Pi.
