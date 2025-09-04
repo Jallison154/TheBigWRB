@@ -10,8 +10,8 @@ from datetime import datetime
 # Configuration
 BAUD = 115200
 SERIAL = os.getenv("MATT_SFX_SERIAL", "/dev/ttyACM0")
-READY_PIN = 18
-USB_LED_PIN = 23  # New LED for USB drive status
+READY_PIN = 23
+USB_LED_PIN = 24  # New LED for USB drive status
 READY_ACTIVE_LOW = True
 USB_LED_ACTIVE_LOW = True  # USB LED also active-low
 MIX_FREQ = 44100
@@ -20,10 +20,15 @@ RESCAN_SEC = 1.0
 IDLE_SHUTOFF_SEC = 1.0
 LOG_FILE = "/home/pi/mattsfx/button_log.txt"
 
+# Hold configuration
+HOLD_ENABLED = True  # Set to False to disable hold functionality
+HOLD_DELAY_MS = 1000  # Milliseconds to hold button before triggering hold sound
+
 # ESP32 Message Types (matching your ESP32 code)
 MSG_PING = 0xA0
 MSG_ACK = 0xA1
 MSG_BTN = 0xB0
+MSG_BTN_HOLD = 0xB1
 
 # --- LED (PWM for status LED, simple on/off for USB LED) ---
 try:
@@ -85,18 +90,22 @@ def pick_source():
     update_usb_led(mounts)  # Update USB LED status
     
     for mnt in mounts:
-        R = sorted(glob.glob(os.path.join(mnt, "right*.wav")))
-        W = sorted(glob.glob(os.path.join(mnt, "wrong*.wav")))
-        if R or W:
+        B1 = sorted(glob.glob(os.path.join(mnt, "button1*.wav")))
+        B2 = sorted(glob.glob(os.path.join(mnt, "button2*.wav")))
+        H1 = sorted(glob.glob(os.path.join(mnt, "hold1*.wav")))
+        H2 = sorted(glob.glob(os.path.join(mnt, "hold2*.wav")))
+        if B1 or B2 or H1 or H2:
             blink_usb_led()  # Blink to indicate USB drive with sound files
-            return (f"USB:{mnt}", R[:1], W)
+            return (f"USB:{mnt}", B1[:1], B2, H1[:1], H2)
     
     # Fall back to local storage
     local = os.path.expanduser("~/mattsfx")
     os.makedirs(local, exist_ok=True)
-    R = sorted(glob.glob(os.path.join(local, "right*.wav")))
-    W = sorted(glob.glob(os.path.join(local, "wrong*.wav")))
-    return ("LOCAL", R[:1], W)
+    B1 = sorted(glob.glob(os.path.join(local, "button1*.wav")))
+    B2 = sorted(glob.glob(os.path.join(local, "button2*.wav")))
+    H1 = sorted(glob.glob(os.path.join(local, "hold1*.wav")))
+    H2 = sorted(glob.glob(os.path.join(local, "hold2*.wav")))
+    return ("LOCAL", B1[:1], B2, H1[:1], H2)
 
 def classify_esp32_message(line):
     """
@@ -109,10 +118,14 @@ def classify_esp32_message(line):
     try:
         # Look for ESP32 button messages: "RX: BTN1 from MAC" or "RX: BTN2 from MAC"
         if "RX: BTN" in line:
-            if "BTN1" in line:
-                return 'R', line  # Button 1 = Right
+            if "BTN1 HOLD" in line:
+                return 'RH', line  # Button 1 Hold
+            elif "BTN2 HOLD" in line:
+                return 'WH', line  # Button 2 Hold
+            elif "BTN1" in line:
+                return 'B1', line  # Button 1 = Button 1
             elif "BTN2" in line:
-                return 'W', line  # Button 2 = Wrong
+                return 'B2', line  # Button 2 = Button 2
         elif "Authorized transmitter connected" in line:
             return 'CONNECT', line
         elif "Status:" in line:
@@ -130,23 +143,25 @@ def classify_esp32_message(line):
     
     # Fall back to old format parsing
     u = line.upper()
-    if u == "R" or "RIGHT" in u or "BTN1" in u or "BTN_R" in u:
-        return 'R', line
-    if u == "W" or "WRONG" in u or "BTN2" in u or "BTN_W" in u:
-        return 'W', line
+    if u == "R" or "BTN1" in u or "BTN_R" in u:
+        return 'B1', line
+    if u == "W" or "BTN2" in u or "BTN_W" in u:
+        return 'B2', line
     
     return None, line
 
 # --- Audio System ---
 _mixer_ready = False
 _last_play = 0
-_right_paths = []
-_wrong_paths = []
+_button1_paths = []
+_button2_paths = []
+_hold1_paths = []
+_hold2_paths = []
 
-def set_paths(R, W):
+def set_paths(B1, B2, H1, H2):
     """Set audio file paths"""
-    global _right_paths, _wrong_paths
-    _right_paths, _wrong_paths = R, W
+    global _button1_paths, _button2_paths, _hold1_paths, _hold2_paths
+    _button1_paths, _button2_paths, _hold1_paths, _hold2_paths = B1, B2, H1, H2
 
 def ensure_mixer():
     """Initialize pygame mixer"""
@@ -158,10 +173,10 @@ def ensure_mixer():
         import pygame
         for i in range(8):
             try:
-                pygame.mixer.init(frequency=MIX_FREQ, size=-16, channels=2, buffer=MIX_BUF)
+                pygame.mixer.init(frequency=MIX_FREQ, size=-16, channels=4, buffer=MIX_BUF)
                 _mixer_ready = True
-                print("[mattsfx] audio: mixer ready", flush=True)
-                log_event("Audio mixer initialized")
+                print("[mattsfx] audio: mixer ready (4 channels)", flush=True)
+                log_event("Audio mixer initialized with 4 channels")
                 return
             except Exception as e:
                 print(f"[mattsfx] audio init retry {i+1}: {e}", flush=True)
@@ -186,40 +201,75 @@ def shutdown_mixer_if_idle():
     except:
         pass
 
-def play_right():
-    """Play right sound effect"""
+def play_button1():
+    """Play button 1 sound effect"""
     global _last_play
-    if not _right_paths:
-        print("[mattsfx] RIGHT (no file)", flush=True)
+    if not _button1_paths:
+        print("[mattsfx] BUTTON1 (no file)", flush=True)
         return
     
     ensure_mixer()
     try:
         import pygame
-        s = pygame.mixer.Sound(_right_paths[0])
+        s = pygame.mixer.Sound(_button1_paths[0])
         pygame.mixer.Channel(0).play(s)
         _last_play = time.time()
-        log_event(f"Played RIGHT sound: {_right_paths[0]}")
+        log_event(f"Played BUTTON1 sound: {_button1_paths[0]}")
     except Exception as e:
-        print(f"[mattsfx] Error playing right sound: {e}", flush=True)
+        print(f"[mattsfx] Error playing button1 sound: {e}", flush=True)
 
-def play_wrong():
-    """Play wrong sound effect"""
+def play_button2():
+    """Play button 2 sound effect"""
     global _last_play
-    if not _wrong_paths:
-        print("[mattsfx] WRONG (no files)", flush=True)
+    if not _button2_paths:
+        print("[mattsfx] BUTTON2 (no files)", flush=True)
         return
     
     ensure_mixer()
     try:
         import pygame
-        sound_file = random.choice(_wrong_paths)
+        sound_file = random.choice(_button2_paths)
         s = pygame.mixer.Sound(sound_file)
         pygame.mixer.Channel(1).play(s)
         _last_play = time.time()
-        log_event(f"Played WRONG sound: {sound_file}")
+        log_event(f"Played BUTTON2 sound: {sound_file}")
     except Exception as e:
-        print(f"[mattsfx] Error playing wrong sound: {e}", flush=True)
+        print(f"[mattsfx] Error playing button2 sound: {e}", flush=True)
+
+def play_hold1():
+    """Play button 1 hold sound effect"""
+    global _last_play
+    if not _hold1_paths:
+        print("[mattsfx] HOLD1 (no file)", flush=True)
+        return
+    
+    ensure_mixer()
+    try:
+        import pygame
+        s = pygame.mixer.Sound(_hold1_paths[0])
+        pygame.mixer.Channel(2).play(s)  # Use channel 2 for hold sounds
+        _last_play = time.time()
+        log_event(f"Played HOLD1 sound: {_hold1_paths[0]}")
+    except Exception as e:
+        print(f"[mattsfx] Error playing hold1 sound: {e}", flush=True)
+
+def play_hold2():
+    """Play button 2 hold sound effect"""
+    global _last_play
+    if not _hold2_paths:
+        print("[mattsfx] HOLD2 (no files)", flush=True)
+        return
+    
+    ensure_mixer()
+    try:
+        import pygame
+        sound_file = random.choice(_hold2_paths)
+        s = pygame.mixer.Sound(sound_file)
+        pygame.mixer.Channel(3).play(s)  # Use channel 3 for hold sounds
+        _last_play = time.time()
+        log_event(f"Played HOLD2 sound: {sound_file}")
+    except Exception as e:
+        print(f"[mattsfx] Error playing hold2 sound: {e}", flush=True)
 
 def blink_led():
     """Blink the ready LED at full brightness"""
@@ -272,10 +322,10 @@ def main():
     log_event("Pi script started")
     
     # Initialize audio source
-    tag, R, W = pick_source()
-    set_paths(R, W)
-    print(f"[mattsfx] source={tag} right={R[:1]} wrongs={len(W)}", flush=True)
-    log_event(f"Audio source: {tag}, Right sounds: {len(R)}, Wrong sounds: {len(W)}")
+    tag, B1, B2, H1, H2 = pick_source()
+    set_paths(B1, B2, H1, H2)
+    print(f"[mattsfx] source={tag} button1={B1[:1]} button2s={len(B2)} hold1={H1[:1]} hold2s={len(H2)}", flush=True)
+    log_event(f"Audio source: {tag}, Button1 sounds: {len(B1)}, Button2 sounds: {len(B2)}, Hold1 sounds: {len(H1)}, Hold2 sounds: {len(H2)}")
     
     # Connect to ESP32
     ser = wait_serial()
@@ -292,11 +342,11 @@ def main():
     while True:
         # Hot-swap audio files
         if time.time() - last_scan > RESCAN_SEC:
-            ntag, nR, nW = pick_source()
-            if (ntag != tag) or (nR != R) or (nW != W):
-                tag, R, W = ntag, nR, nW
-                set_paths(R, W)
-                print(f"[mattsfx] reloaded: source={tag} right={R[:1]} wrongs={len(W)}", flush=True)
+            ntag, nB1, nB2, nH1, nH2 = pick_source()
+            if (ntag != tag) or (nB1 != B1) or (nB2 != B2) or (nH1 != H1) or (nH2 != H2):
+                tag, B1, B2, H1, H2 = ntag, nB1, nB2, nH1, nH2
+                set_paths(B1, B2, H1, H2)
+                print(f"[mattsfx] reloaded: source={tag} button1={B1[:1]} button2s={len(B2)} hold1={H1[:1]} hold2s={len(H2)}", flush=True)
                 log_event(f"Audio files reloaded: {tag}")
             last_scan = time.time()
         
@@ -324,17 +374,29 @@ def main():
         # Parse and handle ESP32 messages
         msg_type, full_line = classify_esp32_message(line)
         
-        if msg_type == 'R':
-            print("[mattsfx] RIGHT button pressed", flush=True)
-            play_right()
+        if msg_type == 'B1':
+            print("[mattsfx] Button 1 pressed", flush=True)
+            play_button1()
             blink_led()
-            log_event("RIGHT button pressed")
+            log_event("Button 1 pressed")
             
-        elif msg_type == 'W':
-            print("[mattsfx] WRONG button pressed", flush=True)
-            play_wrong()
+        elif msg_type == 'B2':
+            print("[mattsfx] Button 2 pressed", flush=True)
+            play_button2()
             blink_led()
-            log_event("WRONG button pressed")
+            log_event("Button 2 pressed")
+            
+        elif msg_type == 'RH':
+            print("[mattsfx] Button 1 held", flush=True)
+            play_hold1()
+            blink_led()
+            log_event("Button 1 held")
+            
+        elif msg_type == 'WH':
+            print("[mattsfx] Button 2 held", flush=True)
+            play_hold2()
+            blink_led()
+            log_event("Button 2 held")
             
         elif msg_type == 'CONNECT':
             print(f"[mattsfx] ESP32: {full_line}", flush=True)

@@ -17,7 +17,7 @@ const bool BTN_ACTIVE_LOW = true;  // true = button to GND with INPUT_PULLUP
 uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // <-- your RX MAC (58:8c:81:9e:30:10)
 
 // ---------- Messages ----------
-enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0 };
+enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0, MSG_BTN_HOLD=0xB1 };
 
 // ---------- Link / timing ----------
 uint32_t lastAckMs = 0;
@@ -48,18 +48,48 @@ struct BtnDeb {
   int lastLevel;
   uint32_t lastFlip;
   bool armed;
+  bool pressed;           // Track if button is currently pressed
+  uint32_t pressStartMs; // When button was first pressed
+  bool holdSent;          // Whether we've already sent the hold message
 };
 const uint16_t DEBOUNCE_MS = 40;
-BtnDeb b1{BTN1_PIN, BTN_ACTIVE_LOW, HIGH, 0, true};
-BtnDeb b2{BTN2_PIN, BTN_ACTIVE_LOW, HIGH, 0, true};
+const uint16_t HOLD_DELAY_MS = 500;  // 500ms to trigger hold
+BtnDeb b1{BTN1_PIN, BTN_ACTIVE_LOW, HIGH, 0, true, false, 0, false};
+BtnDeb b2{BTN2_PIN, BTN_ACTIVE_LOW, HIGH, 0, true, false, 0, false};
 
 bool pressEvent(BtnDeb& b){
   int lvl = digitalRead(b.pin);
   uint32_t now = millis();
   if (lvl != b.lastLevel){ b.lastLevel = lvl; b.lastFlip = now; }
   bool active = b.activeLow ? (lvl==LOW) : (lvl==HIGH);
-  if (!active){ b.armed = true; return false; }
-  if (b.armed && (now - b.lastFlip) > DEBOUNCE_MS){ b.armed = false; return true; }
+  
+  if (!active && b.pressed) {
+    // Button released
+    b.pressed = false;
+    b.armed = true;
+    b.holdSent = false;
+    return false;
+  }
+  
+  if (active && !b.pressed && b.armed && (now - b.lastFlip) > DEBOUNCE_MS) {
+    // Button pressed
+    b.pressed = true;
+    b.pressStartMs = now;
+    b.armed = false;
+    return true;
+  }
+  
+  return false;
+}
+
+bool checkHoldEvent(BtnDeb& b) {
+  if (!b.pressed || b.holdSent) return false;
+  
+  uint32_t now = millis();
+  if ((now - b.pressStartMs) >= HOLD_DELAY_MS) {
+    b.holdSent = true;
+    return true;
+  }
   return false;
 }
 
@@ -134,6 +164,24 @@ void sendBtn(uint8_t id){
     }
   }
   Serial.printf("TX: BTN%u failed to send after %d retries\n", id, MAX_RETRIES);
+}
+
+void sendBtnHold(uint8_t id){
+  uint8_t m[2] = { MSG_BTN_HOLD, id };
+  
+  // Retry mechanism for better reliability
+  for (uint8_t retry = 0; retry < MAX_RETRIES; retry++) {
+    esp_err_t result = esp_now_send(RX_MAC, m, sizeof(m));
+    if (result == ESP_OK) {
+      Serial.printf("TX: BTN%u held (local) - sent\n", id);
+      lastActivityMs = millis(); // reset idle timer on local activity
+      return;
+    }
+    if (retry < MAX_RETRIES - 1) {
+      delay(RETRY_DELAY_MS);
+    }
+  }
+  Serial.printf("TX: BTN%u hold failed to send after %d retries\n", id, MAX_RETRIES);
 }
 
 // ---------- Sleep helpers ----------
@@ -222,6 +270,10 @@ void loop(){
   if (ENABLE_SLEEP && (now - lastActivityMs) < IDLE_LIGHT_MS){
     if (pressEvent(b1)) sendBtn(1);
     if (USE_BTN2 && pressEvent(b2)) sendBtn(2);
+
+    // Check for hold events
+    if (checkHoldEvent(b1)) sendBtnHold(1);
+    if (USE_BTN2 && checkHoldEvent(b2)) sendBtnHold(2);
 
     static uint32_t lastPing = 0;
     if (now - lastPing >= 500){ lastPing = now; sendPing(); }

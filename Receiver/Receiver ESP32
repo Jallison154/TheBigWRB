@@ -16,7 +16,7 @@ uint8_t ALLOWED_TX_MACS[][6] = {
 const uint8_t NUM_ALLOWED_TXS = sizeof(ALLOWED_TX_MACS) / 6;
 
 // ---------- Messages ----------
-enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0 };
+enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0, MSG_BTN_HOLD=0xB1 };
 
 // ---------- Link tracking ----------
 struct TxLink {
@@ -159,6 +159,20 @@ void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len){
         } else if (btnId == 2) {
           txLinks[txIndex].lastBtn2State = 1;
         }
+        lastBtnActivityMs = now;
+        
+        // Send ACK back
+        sendAck(info->src_addr);
+      }
+      break;
+      
+    case MSG_BTN_HOLD:
+      if (len >= 2) {
+        uint8_t btnId = data[1];
+        Serial.printf("RX: BTN%u HOLD from %02X:%02X:%02X:%02X:%02X:%02X\n", 
+                     btnId, info->src_addr[0], info->src_addr[1], info->src_addr[2],
+                     info->src_addr[3], info->src_addr[4], info->src_addr[5]);
+        
         lastBtnActivityMs = now;
         
         // Send ACK back
