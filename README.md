@@ -1,6 +1,6 @@
 # ESP32 Wireless Button System
 
-A battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** devices with ESP-NOW protocol. The system consists of transmitters (with buttons) and a receiver that processes button presses.
+A battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** devices with ESP-NOW protocol. The system consists of transmitters (with buttons) and a receiver that processes button presses, with enhanced hold functionality and Raspberry Pi integration for audio feedback.
 
 ## System Overview
 
@@ -9,13 +9,16 @@ A battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** d
 - **Protocol**: ESP-NOW for low-latency, direct communication
 - **Power Management**: Advanced sleep modes for extended battery life
 - **Security**: MAC address-based authentication to ensure devices only communicate with authorized partners
+- **Hold Functionality**: Buttons can be held for extended actions without triggering normal press sounds
+- **Audio Integration**: Raspberry Pi script for playing different sounds based on button actions
 
 ## Files
 
 - `Transmitter_ESP32.ino` - Transmitter code (for button devices)
 - `Receiver ESP32` - Receiver code (for central device)
-- `Transmitter ESP32.c` - Original transmitter file (legacy)
+- `Transmitter ESP32.c` - Enhanced transmitter with hold detection
 - `MAC_Finder.ino` - Utility to find device MAC addresses
+- `Pi Zero/Pi Script` - Enhanced Raspberry Pi script for audio playback
 
 ## Key Improvements Made
 
@@ -48,6 +51,18 @@ A battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** d
 - **Transmitter**: Only accepts responses from authorized receiver MAC
 - **Receiver**: Only accepts messages from pre-configured transmitter MACs
 - **Unauthorized Device Rejection**: Logs and ignores messages from unknown devices
+
+### 7. **Button Hold Functionality** ⭐ **NEW**
+- **Hold Detection**: Buttons can be held for 1 second to trigger hold actions
+- **Dual Sound System**: Different sounds for quick press vs. hold actions
+- **Smart Release**: Hold actions prevent normal press sounds when released
+- **Configurable Timing**: Hold delay is configurable (currently set to 1000ms)
+
+### 8. **Enhanced Audio System** ⭐ **NEW**
+- **4-Channel Audio**: Supports simultaneous playback of multiple sounds
+- **Smart File Naming**: Clear naming convention for different button actions
+- **USB Hot-Swapping**: Automatic detection and use of sound files from USB drives
+- **Local Fallback**: Falls back to local storage if no USB drive is available
 
 ## Hardware Setup
 
@@ -118,6 +133,10 @@ uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // Your receiver MAC
 - Deep sleep after 15 minutes of inactivity
 - Breathing LED during light sleep phase
 
+### Hold Configuration ⭐ **NEW**
+- Hold delay: 1000ms (1 second) - configurable in Pi script
+- Hold functionality can be enabled/disabled via configuration
+
 ## Usage
 
 ### Arduino IDE Setup
@@ -156,10 +175,16 @@ uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // Your receiver MAC
      - 25%: Transmitters connected
      - Double blink: No transmitters connected
 
+### Button Actions ⭐ **NEW**
+- **Quick Press and Release** (< 1 second): Triggers normal button action
+- **Hold Button** (≥ 1 second): Triggers hold action, prevents normal action on release
+- **Release After Hold**: No additional sound plays
+
 ### Serial Output
 Both devices provide detailed serial output for debugging:
 - Connection status
 - Button press events
+- Button hold events ⭐ **NEW**
 - Error messages
 - Power management events
 - **Security events**: Rejected unauthorized MAC addresses
@@ -213,11 +238,17 @@ Both devices provide detailed serial output for debugging:
    - Check serial output for "Rejected message from unauthorized MAC"
    - Ensure transmitter MAC is in receiver's allowed list
 
+6. **Hold Functionality Not Working** ⭐ **NEW**
+   - Verify hold delay is set correctly (default: 1000ms)
+   - Check that hold sounds are properly named and located
+   - Ensure Pi script is detecting hold messages correctly
+
 ### Debugging
 - Monitor serial output on both devices
 - Check LED indicators for status
 - Use WiFi analyzer to check for channel conflicts
 - Look for security rejection messages
+- Check Pi script logs for hold message detection
 
 ## Customization
 
@@ -225,6 +256,7 @@ Both devices provide detailed serial output for debugging:
 1. Define additional button pins
 2. Add button debouncer structures
 3. Update button handling in loop()
+4. Add corresponding hold detection for new buttons
 
 ### Adding More Transmitters
 1. Add transmitter MAC to `ALLOWED_TX_MACS` array in receiver
@@ -236,6 +268,12 @@ Modify these constants in the transmitter:
 ```cpp
 const uint32_t IDLE_LIGHT_MS = 5UL * 60UL * 1000UL;  // Light sleep delay
 const uint32_t IDLE_DEEP_MS = 15UL * 60UL * 1000UL;  // Deep sleep delay
+```
+
+### Changing Hold Timing
+Modify the hold delay in the Pi script:
+```python
+HOLD_DELAY_MS = 1000  # Milliseconds to hold button before triggering hold sound
 ```
 
 ### Adding Actions
@@ -252,6 +290,18 @@ case MSG_BTN:
     }
   }
   break;
+
+case MSG_BTN_HOLD:  // ⭐ NEW: Handle hold actions
+  if (len >= 2) {
+    uint8_t btnId = data[1];
+    // Add your custom hold actions here
+    if (btnId == 1) {
+      // Handle button 1 hold
+    } else if (btnId == 2) {
+      // Handle button 2 hold
+    }
+  }
+  break;
 ```
 
 ## License
@@ -262,24 +312,50 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ### Enhanced Pi Script
 
-The system includes an enhanced Raspberry Pi script that works seamlessly with the ESP32 receiver to play sound effects based on button presses.
+The system includes an enhanced Raspberry Pi script that works seamlessly with the ESP32 receiver to play sound effects based on button presses and holds.
 
 #### Features:
 - **ESP32 Message Parsing**: Automatically detects and parses ESP32 button messages
-- **Audio Playback**: Plays different sounds for correct/incorrect answers
+- **Hold Detection**: Supports both quick press and hold button actions
+- **4-Channel Audio**: Plays different sounds simultaneously for different actions
+- **Smart File Naming**: Clear naming convention for easy organization
 - **USB Hot-Swapping**: Automatically detects and uses sound files from USB drives
 - **USB LED Indicator**: Visual indicator showing when USB drives are mounted
-- **Logging**: Comprehensive logging of all button presses and system events
-- **LED Feedback**: Visual feedback when buttons are pressed
+- **Logging**: Comprehensive logging of all button presses, holds, and system events
+- **LED Feedback**: Visual feedback when buttons are pressed or held
 - **Auto-Restart**: Automatically restarts if the ESP32 connection is lost
 - **Systemd Service**: Runs as a system service that starts on boot
+
+#### Sound File Organization ⭐ **NEW**
+
+The system now uses a clear, logical naming convention:
+
+- **`button1*.wav`** - Sound files for Button 1 quick press actions
+- **`button2*.wav`** - Sound files for Button 2 quick press actions  
+- **`hold1*.wav`** - Sound files for Button 1 hold actions
+- **`hold2*.wav`** - Sound files for Button 2 hold actions
+
+**File Examples:**
+```
+button1_correct.wav    # Button 1 quick press sound
+button2_incorrect.wav  # Button 2 quick press sound
+hold1_extended.wav     # Button 1 hold sound
+hold2_special.wav      # Button 2 hold sound
+```
+
+#### Button Actions ⭐ **NEW**
+
+- **Button 1 Quick Press** → Plays `button1*.wav` file
+- **Button 1 Hold (1 second)** → Plays `hold1*.wav` file (prevents normal button1 sound on release)
+- **Button 2 Quick Press** → Plays `button2*.wav` file
+- **Button 2 Hold (1 second)** → Plays `hold2*.wav` file (prevents normal button2 sound on release)
 
 #### Installation:
 
 1. **Copy the enhanced files to your Pi:**
    ```bash
    # Copy these files to your Raspberry Pi:
-   # - Pi_Script_Enhanced.py
+   # - Pi Script (enhanced version)
    # - mattsfx-enhanced.service
    # - install_enhanced.sh
    ```
@@ -296,14 +372,16 @@ The system includes an enhanced Raspberry Pi script that works seamlessly with t
 
 #### Usage:
 
-1. **Sound Files**: Place your sound files in `~/mattsfx/sounds/`
-   - `right1.wav`, `right2.wav`, etc. for correct answers
-   - `wrong1.wav`, `wrong2.wav`, etc. for incorrect answers
-   - Or use a USB drive with `right*.wav` and `wrong*.wav` files
+1. **Sound Files**: Place your sound files in `~/mattsfx/` or on a USB drive
+   - **Quick Press Sounds**: `button1*.wav`, `button2*.wav`
+   - **Hold Sounds**: `hold1*.wav`, `hold2*.wav`
+   - **USB Drive**: Place files in root directory of USB drive
 
 2. **Button Mapping**:
-   - **Button 1** (D1) → Plays "right" sound
-   - **Button 2** (D2) → Plays "wrong" sound
+   - **Button 1 Quick Press** → Plays `button1*.wav` sound
+   - **Button 1 Hold (1s)** → Plays `hold1*.wav` sound
+   - **Button 2 Quick Press** → Plays `button2*.wav` sound
+   - **Button 2 Hold (1s)** → Plays `hold2*.wav` sound
 
 3. **Monitoring**:
    ```bash
@@ -322,15 +400,16 @@ The system includes an enhanced Raspberry Pi script that works seamlessly with t
 The script automatically detects:
 - ESP32 serial connection (tries multiple ports)
 - Sound files from USB drives or local storage
-- LED feedback on GPIO pin 18
-- USB drive status on GPIO pin 23
+- LED feedback on GPIO pin 23 (ready status)
+- USB drive status on GPIO pin 24
 
-You can customize the configuration by editing the variables at the top of `Pi_Script_Enhanced.py`:
+You can customize the configuration by editing the variables at the top of the Pi script:
 ```python
 BAUD = 115200                    # Serial baud rate
 SERIAL = "/dev/ttyACM0"          # Default serial port
-READY_PIN = 18                   # Ready LED pin
-USB_LED_PIN = 23                 # USB drive LED pin
+READY_PIN = 23                   # Ready LED pin
+USB_LED_PIN = 24                 # USB drive LED pin
+HOLD_DELAY_MS = 1000             # Hold delay in milliseconds
 LOG_FILE = "/home/pi/mattsfx/button_log.txt"  # Log file location
 ```
 
@@ -338,12 +417,12 @@ LOG_FILE = "/home/pi/mattsfx/button_log.txt"  # Log file location
 
 The system uses two LEDs for status indication:
 
-1. **Ready LED (GPIO 18)**: 
+1. **Ready LED (GPIO 23)**: 
    - **ON**: System ready and connected to ESP32
    - **OFF**: System starting up or disconnected
-   - **Blink**: Button press detected
+   - **Blink**: Button press or hold detected
 
-2. **USB LED (GPIO 23)**:
+2. **USB LED (GPIO 24)**:
    - **ON**: USB drive is mounted
    - **OFF**: No USB drive mounted
    - **Blink**: USB drive with sound files detected
@@ -369,6 +448,8 @@ This script will:
 2. **No Serial Connection**: Verify ESP32 is connected and check serial port
 3. **Service Won't Start**: Check logs with `sudo journalctl -u mattsfx-enhanced.service`
 4. **Permission Errors**: Ensure pi user is in the audio group
-5. **USB LED Not Working**: Check GPIO pin 23 connections and run test script
+5. **USB LED Not Working**: Check GPIO pin 24 connections and run test script
+6. **Hold Sounds Not Playing**: Verify hold sound files are properly named and located
+7. **Wrong Sound Playing**: Check file naming convention matches expected pattern
 
-The enhanced Pi script provides a complete, production-ready solution for integrating your ESP32 wireless button system with audio feedback on a Raspberry Pi.
+The enhanced Pi script provides a complete, production-ready solution for integrating your ESP32 wireless button system with advanced audio feedback, including the new hold functionality, on a Raspberry Pi.
