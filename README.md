@@ -352,7 +352,14 @@ hold2_special.wav      # Button 2 hold sound
 
 #### Installation:
 
-1. **Copy the enhanced files to your Pi:**
+1. **Connect to your Raspberry Pi:**
+   ```bash
+   ssh pi@WRB01.local
+   # Username: WRB01
+   # Password: wrongright
+   ```
+
+2. **Copy the enhanced files to your Pi:**
    ```bash
    # Copy these files to your Raspberry Pi:
    # - Pi Script (enhanced version)
@@ -360,13 +367,13 @@ hold2_special.wav      # Button 2 hold sound
    # - install_enhanced.sh
    ```
 
-2. **Run the installation script:**
+3. **Run the installation script:**
    ```bash
    chmod +x install_enhanced.sh
    ./install_enhanced.sh
    ```
 
-3. **Connect your ESP32 receiver:**
+4. **Connect your ESP32 receiver:**
    - Connect the ESP32 receiver to the Pi via USB
    - The service will automatically detect and connect to it
 
