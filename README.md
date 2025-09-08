@@ -350,32 +350,144 @@ hold2_special.wav      # Button 2 hold sound
 - **Button 2 Quick Press** → Plays `button2*.wav` file
 - **Button 2 Hold (1 second)** → Plays `hold2*.wav` file (prevents normal button2 sound on release)
 
-#### Installation:
+#### Complete Pi Zero Setup Guide:
 
-1. **Connect to your Raspberry Pi:**
+##### **Step 1: Initial Pi Zero Setup**
+1. **Flash Raspberry Pi OS** to your microSD card using Raspberry Pi Imager
+2. **Enable SSH** during imaging or create an empty file named `ssh` in the boot partition
+3. **Configure WiFi** (if using WiFi) by creating `wpa_supplicant.conf` in the boot partition:
+   ```
+   country=US
+   ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+   update_config=1
+   network={
+       ssid="YourWiFiName"
+       psk="YourWiFiPassword"
+   }
+   ```
+4. **Insert microSD card** into Pi Zero and power it on
+5. **Wait 2-3 minutes** for first boot to complete
+
+##### **Step 2: Connect to Your Pi Zero**
+1. **Find your Pi's IP address** (if using WiFi):
+   ```bash
+   # On your computer, scan for the Pi:
+   nmap -sn 192.168.1.0/24 | grep -B2 -A2 "Raspberry Pi"
+   ```
+2. **Connect via SSH:**
    ```bash
    ssh pi@WRB01.local
+   # OR if .local doesn't work:
+   ssh pi@192.168.1.XXX  # Replace with actual IP
    # Username: WRB01
    # Password: wrongright
    ```
 
-2. **Copy the enhanced files to your Pi:**
+##### **Step 3: Update System and Install Dependencies**
+```bash
+# Update package lists
+sudo apt update && sudo apt upgrade -y
+
+# Install required packages
+sudo apt install -y python3-pip python3-pygame python3-serial python3-gpiozero git
+
+# Install pygame (if not already installed)
+pip3 install pygame
+```
+
+##### **Step 4: Transfer WRB Files to Pi**
+1. **From your computer, copy files to Pi:**
    ```bash
-   # Copy these files to your Raspberry Pi:
-   # - Pi Script (enhanced version)
-   # - WRB-enhanced.service
-   # - install_enhanced.sh
+   # Using SCP (replace with actual IP if needed):
+   scp "Pi Script" pi@WRB01.local:~/
+   scp WRB-enhanced.service pi@WRB01.local:~/
+   scp install_enhanced.sh pi@WRB01.local:~/
+   scp config.py pi@WRB01.local:~/
+   scp test_esp32_connection.py pi@WRB01.local:~/
    ```
 
-3. **Run the installation script:**
+2. **Or manually create the files on the Pi:**
    ```bash
-   chmod +x install_enhanced.sh
-   ./install_enhanced.sh
+   # Create the main script
+   nano ~/Pi_Script_Enhanced.py
+   # Copy and paste the contents of "Pi Script" file
+   
+   # Create the service file
+   sudo nano /etc/systemd/system/WRB-enhanced.service
+   # Copy and paste the contents of WRB-enhanced.service
    ```
 
-4. **Connect your ESP32 receiver:**
-   - Connect the ESP32 receiver to the Pi via USB
-   - The service will automatically detect and connect to it
+##### **Step 5: Run Installation Script**
+```bash
+# Make installation script executable
+chmod +x install_enhanced.sh
+
+# Run the installation
+./install_enhanced.sh
+```
+
+##### **Step 6: Verify Installation**
+```bash
+# Check if service is running
+sudo systemctl status WRB-enhanced.service
+
+# Check if directories were created
+ls -la ~/WRB/
+
+# Check if sample sound files were created
+ls -la ~/WRB/sounds/
+```
+
+##### **Step 7: Connect ESP32 Receiver**
+1. **Connect ESP32 receiver** to Pi Zero via USB cable
+2. **Check if ESP32 is detected:**
+   ```bash
+   # List USB devices
+   lsusb
+   
+   # Check serial ports
+   ls /dev/ttyACM* /dev/ttyUSB*
+   ```
+
+##### **Step 8: Test the System**
+```bash
+# Test ESP32 connection
+python3 ~/WRB/test_esp32_connection.py
+
+# Test system integration
+python3 ~/WRB/test_system_integration.py
+
+# Monitor system logs
+sudo journalctl -u WRB-enhanced.service -f
+```
+
+##### **Step 9: Add Your Sound Files**
+1. **Create sound files** with these names:
+   - `button1.wav` - Button 1 quick press sound
+   - `button2.wav` - Button 2 quick press sound  
+   - `hold1.wav` - Button 1 hold sound
+   - `hold2.wav` - Button 2 hold sound
+
+2. **Copy to Pi:**
+   ```bash
+   # Copy via SCP
+   scp button1.wav pi@WRB01.local:~/WRB/sounds/
+   scp button2.wav pi@WRB01.local:~/WRB/sounds/
+   scp hold1.wav pi@WRB01.local:~/WRB/sounds/
+   scp hold2.wav pi@WRB01.local:~/WRB/sounds/
+   ```
+
+##### **Step 10: Final Verification**
+```bash
+# Check service status
+sudo systemctl status WRB-enhanced.service
+
+# View button press logs
+tail -f ~/WRB/button_log.txt
+
+# Test button presses on your ESP32 transmitter
+# You should see log entries and hear sounds
+```
 
 #### Usage:
 
