@@ -356,7 +356,7 @@ hold2_special.wav      # Button 2 hold sound
    ```bash
    # Copy these files to your Raspberry Pi:
    # - Pi Script (enhanced version)
-   # - mattsfx-enhanced.service
+   # - WRB-enhanced.service
    # - install_enhanced.sh
    ```
 
@@ -372,7 +372,7 @@ hold2_special.wav      # Button 2 hold sound
 
 #### Usage:
 
-1. **Sound Files**: Place your sound files in `~/mattsfx/` or on a USB drive
+1. **Sound Files**: Place your sound files in `~/WRB/` or on a USB drive
    - **Quick Press Sounds**: `button1*.wav`, `button2*.wav`
    - **Hold Sounds**: `hold1*.wav`, `hold2*.wav`
    - **USB Drive**: Place files in root directory of USB drive
@@ -386,13 +386,13 @@ hold2_special.wav      # Button 2 hold sound
 3. **Monitoring**:
    ```bash
    # Check service status
-   sudo systemctl status mattsfx-enhanced.service
+   sudo systemctl status WRB-enhanced.service
    
    # View real-time logs
-   sudo journalctl -u mattsfx-enhanced.service -f
+   sudo journalctl -u WRB-enhanced.service -f
    
    # View button press history
-   tail -f ~/mattsfx/button_log.txt
+   tail -f ~/WRB/button_log.txt
    ```
 
 #### Configuration:
@@ -410,7 +410,7 @@ SERIAL = "/dev/ttyACM0"          # Default serial port
 READY_PIN = 23                   # Ready LED pin
 USB_LED_PIN = 24                 # USB drive LED pin
 HOLD_DELAY_MS = 1000             # Hold delay in milliseconds
-LOG_FILE = "/home/pi/mattsfx/button_log.txt"  # Log file location
+LOG_FILE = "/home/pi/WRB/button_log.txt"  # Log file location
 ```
 
 #### LED Indicators:
@@ -446,7 +446,7 @@ This script will:
 
 1. **No Sound**: Check audio permissions and pygame installation
 2. **No Serial Connection**: Verify ESP32 is connected and check serial port
-3. **Service Won't Start**: Check logs with `sudo journalctl -u mattsfx-enhanced.service`
+3. **Service Won't Start**: Check logs with `sudo journalctl -u WRB-enhanced.service`
 4. **Permission Errors**: Ensure pi user is in the audio group
 5. **USB LED Not Working**: Check GPIO pin 24 connections and run test script
 6. **Hold Sounds Not Playing**: Verify hold sound files are properly named and located

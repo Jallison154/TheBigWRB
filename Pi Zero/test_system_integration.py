@@ -101,9 +101,11 @@ def test_usb_detection():
     
     if mounts:
         for mnt in mounts:
-            right_files = sorted(glob.glob(os.path.join(mnt, "right*.wav")))
-            wrong_files = sorted(glob.glob(os.path.join(mnt, "wrong*.wav")))
-            print(f"  {mnt}: {len(right_files)} right sounds, {len(wrong_files)} wrong sounds")
+            button1_files = sorted(glob.glob(os.path.join(mnt, "button1*.wav")))
+            button2_files = sorted(glob.glob(os.path.join(mnt, "button2*.wav")))
+            hold1_files = sorted(glob.glob(os.path.join(mnt, "hold1*.wav")))
+            hold2_files = sorted(glob.glob(os.path.join(mnt, "hold2*.wav")))
+            print(f"  {mnt}: {len(button1_files)} button1, {len(button2_files)} button2, {len(hold1_files)} hold1, {len(hold2_files)} hold2 sounds")
     
     print("✓ USB detection test completed")
     print()
@@ -150,11 +152,13 @@ def test_audio_system():
         return
     
     # Test audio file detection
-    local_dir = os.path.expanduser("~/mattsfx")
+    local_dir = os.path.expanduser("~/WRB")
     if os.path.exists(local_dir):
-        right_files = sorted(glob.glob(os.path.join(local_dir, "right*.wav")))
-        wrong_files = sorted(glob.glob(os.path.join(local_dir, "wrong*.wav")))
-        print(f"Local sounds: {len(right_files)} right, {len(wrong_files)} wrong")
+        button1_files = sorted(glob.glob(os.path.join(local_dir, "button1*.wav")))
+        button2_files = sorted(glob.glob(os.path.join(local_dir, "button2*.wav")))
+        hold1_files = sorted(glob.glob(os.path.join(local_dir, "hold1*.wav")))
+        hold2_files = sorted(glob.glob(os.path.join(local_dir, "hold2*.wav")))
+        print(f"Local sounds: {len(button1_files)} button1, {len(button2_files)} button2, {len(hold1_files)} hold1, {len(hold2_files)} hold2")
     else:
         print("Local sound directory not found")
     
@@ -182,7 +186,7 @@ def test_file_structure():
     print("=== File Structure Test ===")
     
     # Check log directory
-    log_dir = "/home/pi/mattsfx"
+    log_dir = "/home/pi/WRB"
     if os.path.exists(log_dir):
         print(f"✓ Log directory exists: {log_dir}")
     else:

@@ -82,11 +82,13 @@ def test_usb_detection():
         # Test sound file detection
         print("\n2. Testing sound file detection...")
         for mnt in mounts:
-            R = sorted(glob.glob(os.path.join(mnt, "right*.wav")))
-            W = sorted(glob.glob(os.path.join(mnt, "wrong*.wav")))
-            print(f"   {mnt}: {len(R)} right sounds, {len(W)} wrong sounds")
+            B1 = sorted(glob.glob(os.path.join(mnt, "button1*.wav")))
+            B2 = sorted(glob.glob(os.path.join(mnt, "button2*.wav")))
+            H1 = sorted(glob.glob(os.path.join(mnt, "hold1*.wav")))
+            H2 = sorted(glob.glob(os.path.join(mnt, "hold2*.wav")))
+            print(f"   {mnt}: {len(B1)} button1, {len(B2)} button2, {len(H1)} hold1, {len(H2)} hold2 sounds")
             
-            if R or W:
+            if B1 or B2 or H1 or H2:
                 print("   Blinking USB LED...")
                 blink_usb_led()
                 break

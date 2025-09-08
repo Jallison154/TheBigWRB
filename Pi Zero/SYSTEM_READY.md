@@ -38,11 +38,11 @@ sudo apt install python3-pip python3-pygame
 pip3 install pyserial gpiozero
 
 # Create directory
-mkdir -p ~/mattsfx
+mkdir -p ~/WRB
 
 # Copy files
-cp "Pi Script" ~/mattsfx/Pi_Script_Enhanced.py
-chmod +x ~/mattsfx/Pi_Script_Enhanced.py
+cp "Pi Script" ~/WRB/Pi_Script_Enhanced.py
+chmod +x ~/WRB/Pi_Script_Enhanced.py
 ```
 
 ### 4. Test System
@@ -100,7 +100,7 @@ TheBigWRB/
 ### Pi Script Issues
 - Run: `python3 verify_configuration.py`
 - Check dependencies: `pip3 list | grep -E "(pygame|pyserial|gpiozero)"`
-- Check permissions: `ls -la ~/mattsfx/`
+- Check permissions: `ls -la ~/WRB/`
 
 ### Audio Issues
 - Add user to audio group: `sudo usermod -a -G audio pi`

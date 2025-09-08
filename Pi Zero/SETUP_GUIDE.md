@@ -72,26 +72,26 @@ pip3 install pyserial gpiozero
 
 ### Create Directory Structure
 ```bash
-mkdir -p ~/mattsfx
-chmod 755 ~/mattsfx
+mkdir -p ~/WRB
+chmod 755 ~/WRB
 ```
 
 ### Copy Files
 ```bash
-# Copy the Pi script to the mattsfx directory
-cp "Pi Script" ~/mattsfx/Pi_Script_Enhanced.py
-chmod +x ~/mattsfx/Pi_Script_Enhanced.py
+# Copy the Pi script to the WRB directory
+cp "Pi Script" ~/WRB/Pi_Script_Enhanced.py
+chmod +x ~/WRB/Pi_Script_Enhanced.py
 
 # Copy test scripts
-cp test_usb_led.py ~/mattsfx/
-cp test_system_integration.py ~/mattsfx/
+cp test_usb_led.py ~/WRB/
+cp test_system_integration.py ~/WRB/
 ```
 
 ## Step 6: Test System
 
 ### Run Integration Test
 ```bash
-cd ~/mattsfx
+cd ~/WRB
 python3 test_system_integration.py
 ```
 
@@ -109,14 +109,16 @@ python3 Pi_Script_Enhanced.py
 
 ### Option 1: Local Storage
 ```bash
-# Create sound files in ~/mattsfx/
-# right1.wav, right2.wav, etc. for correct answers
-# wrong1.wav, wrong2.wav, etc. for incorrect answers
+# Create sound files in ~/WRB/sounds/
+# button1*.wav for Button 1 quick press sounds
+# button2*.wav for Button 2 quick press sounds
+# hold1*.wav for Button 1 hold sounds
+# hold2*.wav for Button 2 hold sounds
 ```
 
 ### Option 2: USB Drive
 - Format USB drive as FAT32
-- Add sound files with names: `right*.wav`, `wrong*.wav`
+- Add sound files with names: `button1*.wav`, `button2*.wav`, `hold1*.wav`, `hold2*.wav`
 - Insert USB drive into Pi
 
 ## Step 8: Verify Operation
@@ -127,13 +129,15 @@ python3 Pi_Script_Enhanced.py
 - **ESP32 LEDs**: Show connection status
 
 ### Button Mapping
-- **Button 1**: Plays "right" sound
-- **Button 2**: Plays "wrong" sound
+- **Button 1 Quick Press**: Plays `button1*.wav` sound
+- **Button 1 Hold (1s)**: Plays `hold1*.wav` sound
+- **Button 2 Quick Press**: Plays `button2*.wav` sound
+- **Button 2 Hold (1s)**: Plays `hold2*.wav` sound
 
 ### Serial Output
 Monitor with:
 ```bash
-tail -f ~/mattsfx/button_log.txt
+tail -f ~/WRB/button_log.txt
 ```
 
 ## Troubleshooting
@@ -145,7 +149,7 @@ tail -f ~/mattsfx/button_log.txt
 
 ### Pi Script Issues
 1. Run integration test: `python3 test_system_integration.py`
-2. Check permissions: `ls -la ~/mattsfx/`
+2. Check permissions: `ls -la ~/WRB/`
 3. Check dependencies: `pip3 list | grep -E "(pygame|pyserial|gpiozero)"`
 
 ### Audio Issues
@@ -179,14 +183,16 @@ tail -f ~/mattsfx/button_log.txt
 
 ## File Structure
 ```
-~/mattsfx/
+~/WRB/
 ├── Pi_Script_Enhanced.py    # Main script
 ├── test_usb_led.py          # USB LED test
 ├── test_system_integration.py # System test
 ├── button_log.txt           # Button press log
 └── sounds/                  # Sound files (optional)
-    ├── right1.wav
-    ├── wrong1.wav
+    ├── button1.wav
+    ├── button2.wav
+    ├── hold1.wav
+    ├── hold2.wav
     └── ...
 ```
 

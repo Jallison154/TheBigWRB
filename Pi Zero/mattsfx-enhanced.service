@@ -7,10 +7,10 @@ Wants=network.target
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/mattsfx
+WorkingDirectory=/home/pi/WRB
 Environment=MATT_SFX_SERIAL=/dev/ttyACM0
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /home/pi/mattsfx/Pi_Script_Reliable.py
+ExecStart=/usr/bin/python3 /home/pi/WRB/Pi_Script_Reliable.py
 Restart=always
 RestartSec=5
 StandardOutput=journal

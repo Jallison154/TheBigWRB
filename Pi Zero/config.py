@@ -31,8 +31,8 @@ RESCAN_SEC = 1.0
 IDLE_SHUTOFF_SEC = 1.0
 
 # File Paths
-LOG_FILE = "/home/pi/mattsfx/button_log.txt"
-HEALTH_LOG = "/home/pi/mattsfx/health_log.txt"
+LOG_FILE = "/home/pi/WRB/button_log.txt"
+HEALTH_LOG = "/home/pi/WRB/health_log.txt"
 
 # ESP32 Message Types
 MSG_PING = 0xA0

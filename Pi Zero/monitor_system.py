@@ -11,9 +11,9 @@ import subprocess
 from datetime import datetime, timedelta
 
 # Configuration
-LOG_FILE = "/home/pi/mattsfx/button_log.txt"
-HEALTH_LOG = "/home/pi/mattsfx/health_log.txt"
-SERVICE_NAME = "mattsfx-enhanced.service"
+LOG_FILE = "/home/pi/WRB/button_log.txt"
+HEALTH_LOG = "/home/pi/WRB/health_log.txt"
+SERVICE_NAME = "WRB-enhanced.service"
 
 def check_service_status():
     """Check if the systemd service is running"""
@@ -93,13 +93,15 @@ def get_recent_button_presses(hours=1):
 def check_sound_files():
     """Check if sound files are available"""
     sound_dirs = [
-        "/home/pi/mattsfx/sounds",
+        "/home/pi/WRB/sounds",
         "/media"
     ]
     
     sound_files = {
-        'right': [],
-        'wrong': []
+        'button1': [],
+        'button2': [],
+        'hold1': [],
+        'hold2': []
     }
     
     for base_dir in sound_dirs:
@@ -107,11 +109,15 @@ def check_sound_files():
             continue
             
         # Check local sounds directory
-        if base_dir == "/home/pi/mattsfx/sounds":
-            right_files = [f for f in os.listdir(base_dir) if f.startswith('right') and f.endswith('.wav')]
-            wrong_files = [f for f in os.listdir(base_dir) if f.startswith('wrong') and f.endswith('.wav')]
-            sound_files['right'].extend([os.path.join(base_dir, f) for f in right_files])
-            sound_files['wrong'].extend([os.path.join(base_dir, f) for f in wrong_files])
+        if base_dir == "/home/pi/WRB/sounds":
+            button1_files = [f for f in os.listdir(base_dir) if f.startswith('button1') and f.endswith('.wav')]
+            button2_files = [f for f in os.listdir(base_dir) if f.startswith('button2') and f.endswith('.wav')]
+            hold1_files = [f for f in os.listdir(base_dir) if f.startswith('hold1') and f.endswith('.wav')]
+            hold2_files = [f for f in os.listdir(base_dir) if f.startswith('hold2') and f.endswith('.wav')]
+            sound_files['button1'].extend([os.path.join(base_dir, f) for f in button1_files])
+            sound_files['button2'].extend([os.path.join(base_dir, f) for f in button2_files])
+            sound_files['hold1'].extend([os.path.join(base_dir, f) for f in hold1_files])
+            sound_files['hold2'].extend([os.path.join(base_dir, f) for f in hold2_files])
         
         # Check USB drives
         else:
@@ -119,10 +125,14 @@ def check_sound_files():
                 usb_path = os.path.join(base_dir, item)
                 if os.path.ismount(usb_path):
                     try:
-                        right_files = [f for f in os.listdir(usb_path) if f.startswith('right') and f.endswith('.wav')]
-                        wrong_files = [f for f in os.listdir(usb_path) if f.startswith('wrong') and f.endswith('.wav')]
-                        sound_files['right'].extend([os.path.join(usb_path, f) for f in right_files])
-                        sound_files['wrong'].extend([os.path.join(usb_path, f) for f in wrong_files])
+                        button1_files = [f for f in os.listdir(usb_path) if f.startswith('button1') and f.endswith('.wav')]
+                        button2_files = [f for f in os.listdir(usb_path) if f.startswith('button2') and f.endswith('.wav')]
+                        hold1_files = [f for f in os.listdir(usb_path) if f.startswith('hold1') and f.endswith('.wav')]
+                        hold2_files = [f for f in os.listdir(usb_path) if f.startswith('hold2') and f.endswith('.wav')]
+                        sound_files['button1'].extend([os.path.join(usb_path, f) for f in button1_files])
+                        sound_files['button2'].extend([os.path.join(usb_path, f) for f in button2_files])
+                        sound_files['hold1'].extend([os.path.join(usb_path, f) for f in hold1_files])
+                        sound_files['hold2'].extend([os.path.join(usb_path, f) for f in hold2_files])
                     except:
                         continue
     
@@ -139,8 +149,10 @@ def main():
     # Check sound files
     sound_files = check_sound_files()
     print(f"Sound Files:")
-    print(f"  Right sounds: {len(sound_files['right'])}")
-    print(f"  Wrong sounds: {len(sound_files['wrong'])}")
+    print(f"  Button1 sounds: {len(sound_files['button1'])}")
+    print(f"  Button2 sounds: {len(sound_files['button2'])}")
+    print(f"  Hold1 sounds: {len(sound_files['hold1'])}")
+    print(f"  Hold2 sounds: {len(sound_files['hold2'])}")
     
     if sound_files['right']:
         print(f"  Right files: {[os.path.basename(f) for f in sound_files['right'][:3]]}")

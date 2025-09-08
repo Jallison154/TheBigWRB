@@ -12,8 +12,8 @@ fi
 
 # Create directory structure
 echo "Creating directory structure..."
-mkdir -p ~/mattsfx
-mkdir -p ~/mattsfx/sounds
+mkdir -p ~/WRB
+mkdir -p ~/WRB/sounds
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
@@ -25,14 +25,14 @@ pip3 install pygame
 
 # Copy the reliable script and supporting files
 echo "Installing reliable Pi script and supporting files..."
-cp Pi_Script_Reliable.py ~/mattsfx/
-cp monitor_system.py ~/mattsfx/
-chmod +x ~/mattsfx/Pi_Script_Reliable.py
-chmod +x ~/mattsfx/monitor_system.py
+cp Pi_Script_Reliable.py ~/WRB/
+cp monitor_system.py ~/WRB/
+chmod +x ~/WRB/Pi_Script_Reliable.py
+chmod +x ~/WRB/monitor_system.py
 
 # Install systemd service
 echo "Installing systemd service..."
-sudo cp mattsfx-enhanced.service /etc/systemd/system/
+sudo cp WRB-enhanced.service /etc/systemd/system/
 sudo systemctl daemon-reload
 
 # Set up audio permissions
@@ -41,45 +41,63 @@ sudo usermod -a -G audio pi
 
 # Create sample sound files (if they don't exist)
 echo "Setting up sample sound files..."
-if [ ! -f ~/mattsfx/sounds/right1.wav ]; then
-    echo "Creating sample right sound file..."
+if [ ! -f ~/WRB/sounds/button1.wav ]; then
+    echo "Creating sample button1 sound file..."
     # Create a simple beep sound using sox if available
     if command -v sox &> /dev/null; then
-        sox -n -r 44100 -c 2 ~/mattsfx/sounds/right1.wav synth 0.5 sine 800
+        sox -n -r 44100 -c 2 ~/WRB/sounds/button1.wav synth 0.5 sine 800
     else
-        echo "sox not found. Please install sox or add your own right1.wav file to ~/mattsfx/sounds/"
+        echo "sox not found. Please install sox or add your own button1.wav file to ~/WRB/sounds/"
     fi
 fi
 
-if [ ! -f ~/mattsfx/sounds/wrong1.wav ]; then
-    echo "Creating sample wrong sound file..."
+if [ ! -f ~/WRB/sounds/button2.wav ]; then
+    echo "Creating sample button2 sound file..."
     if command -v sox &> /dev/null; then
-        sox -n -r 44100 -c 2 ~/mattsfx/sounds/wrong1.wav synth 0.5 sine 400
+        sox -n -r 44100 -c 2 ~/WRB/sounds/button2.wav synth 0.5 sine 400
     else
-        echo "sox not found. Please install sox or add your own wrong1.wav file to ~/mattsfx/sounds/"
+        echo "sox not found. Please install sox or add your own button2.wav file to ~/WRB/sounds/"
+    fi
+fi
+
+if [ ! -f ~/WRB/sounds/hold1.wav ]; then
+    echo "Creating sample hold1 sound file..."
+    if command -v sox &> /dev/null; then
+        sox -n -r 44100 -c 2 ~/WRB/sounds/hold1.wav synth 1.0 sine 600
+    else
+        echo "sox not found. Please install sox or add your own hold1.wav file to ~/WRB/sounds/"
+    fi
+fi
+
+if [ ! -f ~/WRB/sounds/hold2.wav ]; then
+    echo "Creating sample hold2 sound file..."
+    if command -v sox &> /dev/null; then
+        sox -n -r 44100 -c 2 ~/WRB/sounds/hold2.wav synth 1.0 sine 500
+    else
+        echo "sox not found. Please install sox or add your own hold2.wav file to ~/WRB/sounds/"
     fi
 fi
 
 # Create log files
-touch ~/mattsfx/button_log.txt
-touch ~/mattsfx/health_log.txt
+touch ~/WRB/button_log.txt
+touch ~/WRB/health_log.txt
 
 # Set permissions
-chmod 755 ~/mattsfx
-chmod 644 ~/mattsfx/*.py
-chmod 644 ~/mattsfx/*.txt
+chmod 755 ~/WRB
+chmod 644 ~/WRB/*.py
+chmod 644 ~/WRB/*.txt
 
 # Enable and start service
 echo "Enabling and starting service..."
-sudo systemctl enable mattsfx-enhanced.service
-sudo systemctl start mattsfx-enhanced.service
+sudo systemctl enable WRB-enhanced.service
+sudo systemctl start WRB-enhanced.service
 
 # Check service status
 echo ""
 echo "=== Installation Complete ==="
 echo ""
 echo "Service status:"
-sudo systemctl status mattsfx-enhanced.service --no-pager
+sudo systemctl status WRB-enhanced.service --no-pager
 
 echo ""
 echo "=== Reliability Features Installed ==="
@@ -97,30 +115,32 @@ echo "=== Usage Instructions ==="
 echo "1. Connect your ESP32 receiver to the Pi via USB"
 echo "2. The service will automatically start and look for the ESP32"
 echo "3. Press buttons on your ESP32 transmitters to trigger sounds"
-echo "4. Monitor system health with: python3 ~/mattsfx/monitor_system.py"
+echo "4. Monitor system health with: python3 ~/WRB/monitor_system.py"
 
 echo ""
 echo "=== Useful Commands ==="
-echo "Check service status: sudo systemctl status mattsfx-enhanced.service"
-echo "View logs: sudo journalctl -u mattsfx-enhanced.service -f"
-echo "Restart service: sudo systemctl restart mattsfx-enhanced.service"
-echo "Stop service: sudo systemctl stop mattsfx-enhanced.service"
-echo "Monitor system: python3 ~/mattsfx/monitor_system.py"
-echo "View button logs: tail -f ~/mattsfx/button_log.txt"
-echo "View health logs: tail -f ~/mattsfx/health_log.txt"
+echo "Check service status: sudo systemctl status WRB-enhanced.service"
+echo "View logs: sudo journalctl -u WRB-enhanced.service -f"
+echo "Restart service: sudo systemctl restart WRB-enhanced.service"
+echo "Stop service: sudo systemctl stop WRB-enhanced.service"
+echo "Monitor system: python3 ~/WRB/monitor_system.py"
+echo "View button logs: tail -f ~/WRB/button_log.txt"
+echo "View health logs: tail -f ~/WRB/health_log.txt"
 
 echo ""
 echo "=== Sound Files ==="
-echo "Place your sound files in ~/mattsfx/sounds/"
-echo "- right1.wav, right2.wav, etc. for correct answers"
-echo "- wrong1.wav, wrong2.wav, etc. for incorrect answers"
-echo "Or use a USB drive with right*.wav and wrong*.wav files"
+echo "Place your sound files in ~/WRB/sounds/"
+echo "- button1*.wav for Button 1 quick press sounds"
+echo "- button2*.wav for Button 2 quick press sounds"
+echo "- hold1*.wav for Button 1 hold sounds"
+echo "- hold2*.wav for Button 2 hold sounds"
+echo "Or use a USB drive with button1*.wav, button2*.wav, hold1*.wav, hold2*.wav files"
 
 echo ""
 echo "=== Logging ==="
-echo "Button press logs: ~/mattsfx/button_log.txt"
-echo "Health statistics: ~/mattsfx/health_log.txt"
-echo "System logs: sudo journalctl -u mattsfx-enhanced.service -f"
+echo "Button press logs: ~/WRB/button_log.txt"
+echo "Health statistics: ~/WRB/health_log.txt"
+echo "System logs: sudo journalctl -u WRB-enhanced.service -f"
 
 echo ""
 echo "=== Reliability Features ==="

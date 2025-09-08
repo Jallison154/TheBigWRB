@@ -18,7 +18,7 @@ MIX_FREQ = 44100
 MIX_BUF = 256
 RESCAN_SEC = 1.0
 IDLE_SHUTOFF_SEC = 1.0
-LOG_FILE = "/home/pi/mattsfx/button_log.txt"
+LOG_FILE = "/home/pi/WRB/button_log.txt"
 
 # Hold configuration
 HOLD_ENABLED = True  # Set to False to disable hold functionality
@@ -40,11 +40,11 @@ try:
     LED_AVAILABLE = True
     USB_LED_AVAILABLE = True
 except ImportError:
-    print("[mattsfx] Warning: gpiozero not available, LED disabled")
+    print("[WRB] Warning: gpiozero not available, LED disabled")
     LED_AVAILABLE = False
     USB_LED_AVAILABLE = False
 except Exception as e:
-    print(f"[mattsfx] Warning: LED initialization failed: {e}")
+    print(f"[WRB] Warning: LED initialization failed: {e}")
     LED_AVAILABLE = False
     USB_LED_AVAILABLE = False
 
@@ -81,7 +81,7 @@ def update_usb_led(mounts):
         else:
             usb_led.on()   # No USB drive mounted (active-low: on = LED off)
     except Exception as e:
-        print(f"[mattsfx] USB LED control failed: {e}", flush=True)
+        print(f"[WRB] USB LED control failed: {e}", flush=True)
 
 def pick_source():
     """Find sound files from USB or local storage"""
@@ -99,7 +99,7 @@ def pick_source():
             return (f"USB:{mnt}", B1[:1], B2, H1[:1], H2)
     
     # Fall back to local storage
-    local = os.path.expanduser("~/mattsfx")
+    local = os.path.expanduser("~/WRB")
     os.makedirs(local, exist_ok=True)
     B1 = sorted(glob.glob(os.path.join(local, "button1*.wav")))
     B2 = sorted(glob.glob(os.path.join(local, "button2*.wav")))
@@ -175,15 +175,15 @@ def ensure_mixer():
             try:
                 pygame.mixer.init(frequency=MIX_FREQ, size=-16, channels=4, buffer=MIX_BUF)
                 _mixer_ready = True
-                print("[mattsfx] audio: mixer ready (4 channels)", flush=True)
+                print("[WRB] audio: mixer ready (4 channels)", flush=True)
                 log_event("Audio mixer initialized with 4 channels")
                 return
             except Exception as e:
-                print(f"[mattsfx] audio init retry {i+1}: {e}", flush=True)
+                print(f"[WRB] audio init retry {i+1}: {e}", flush=True)
                 time.sleep(0.2)
         raise SystemExit("audio init failed")
     except ImportError:
-        print("[mattsfx] Error: pygame not installed. Install with: pip3 install pygame")
+        print("[WRB] Error: pygame not installed. Install with: pip3 install pygame")
         raise SystemExit("pygame not available")
 
 def shutdown_mixer_if_idle():
@@ -197,7 +197,7 @@ def shutdown_mixer_if_idle():
         if (time.time() - _last_play) > IDLE_SHUTOFF_SEC and not pygame.mixer.get_busy():
             pygame.mixer.quit()
             _mixer_ready = False
-            print("[mattsfx] audio: mixer closed (idle)", flush=True)
+            print("[WRB] audio: mixer closed (idle)", flush=True)
     except:
         pass
 
@@ -205,7 +205,7 @@ def play_button1():
     """Play button 1 sound effect"""
     global _last_play
     if not _button1_paths:
-        print("[mattsfx] BUTTON1 (no file)", flush=True)
+        print("[WRB] BUTTON1 (no file)", flush=True)
         return
     
     ensure_mixer()
@@ -216,13 +216,13 @@ def play_button1():
         _last_play = time.time()
         log_event(f"Played BUTTON1 sound: {_button1_paths[0]}")
     except Exception as e:
-        print(f"[mattsfx] Error playing button1 sound: {e}", flush=True)
+        print(f"[WRB] Error playing button1 sound: {e}", flush=True)
 
 def play_button2():
     """Play button 2 sound effect"""
     global _last_play
     if not _button2_paths:
-        print("[mattsfx] BUTTON2 (no files)", flush=True)
+        print("[WRB] BUTTON2 (no files)", flush=True)
         return
     
     ensure_mixer()
@@ -234,13 +234,13 @@ def play_button2():
         _last_play = time.time()
         log_event(f"Played BUTTON2 sound: {sound_file}")
     except Exception as e:
-        print(f"[mattsfx] Error playing button2 sound: {e}", flush=True)
+        print(f"[WRB] Error playing button2 sound: {e}", flush=True)
 
 def play_hold1():
     """Play button 1 hold sound effect"""
     global _last_play
     if not _hold1_paths:
-        print("[mattsfx] HOLD1 (no file)", flush=True)
+        print("[WRB] HOLD1 (no file)", flush=True)
         return
     
     ensure_mixer()
@@ -251,13 +251,13 @@ def play_hold1():
         _last_play = time.time()
         log_event(f"Played HOLD1 sound: {_hold1_paths[0]}")
     except Exception as e:
-        print(f"[mattsfx] Error playing hold1 sound: {e}", flush=True)
+        print(f"[WRB] Error playing hold1 sound: {e}", flush=True)
 
 def play_hold2():
     """Play button 2 hold sound effect"""
     global _last_play
     if not _hold2_paths:
-        print("[mattsfx] HOLD2 (no files)", flush=True)
+        print("[WRB] HOLD2 (no files)", flush=True)
         return
     
     ensure_mixer()
@@ -269,7 +269,7 @@ def play_hold2():
         _last_play = time.time()
         log_event(f"Played HOLD2 sound: {sound_file}")
     except Exception as e:
-        print(f"[mattsfx] Error playing hold2 sound: {e}", flush=True)
+        print(f"[WRB] Error playing hold2 sound: {e}", flush=True)
 
 def blink_led():
     """Blink the ready LED at full brightness"""
@@ -297,14 +297,14 @@ def blink_usb_led():
 
 def wait_serial():
     """Wait for ESP32 serial connection"""
-    print("[mattsfx] waiting for ESP32 serial connection...", flush=True)
+    print("[WRB] waiting for ESP32 serial connection...", flush=True)
     prefs = [SERIAL, "/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/serial0", "/dev/ttyAMA0", "/dev/ttyS0"]
     
     while True:
         for p in prefs:
             try:
                 ser = serial.Serial(p, BAUD, timeout=0.1)
-                print(f"[mattsfx] Connected to ESP32 on {p}", flush=True)
+                print(f"[WRB] Connected to ESP32 on {p}", flush=True)
                 log_event(f"Connected to ESP32 on {p}")
                 return ser
             except:
@@ -318,13 +318,13 @@ def main():
     if USB_LED_AVAILABLE:
         usb_led.off()  # USB LED OFF initially
     
-    print("[mattsfx] ESP32 Wireless Button System - Enhanced Pi Script", flush=True)
+    print("[WRB] ESP32 Wireless Button System - Enhanced Pi Script", flush=True)
     log_event("Pi script started")
     
     # Initialize audio source
     tag, B1, B2, H1, H2 = pick_source()
     set_paths(B1, B2, H1, H2)
-    print(f"[mattsfx] source={tag} button1={B1[:1]} button2s={len(B2)} hold1={H1[:1]} hold2s={len(H2)}", flush=True)
+    print(f"[WRB] source={tag} button1={B1[:1]} button2s={len(B2)} hold1={H1[:1]} hold2s={len(H2)}", flush=True)
     log_event(f"Audio source: {tag}, Button1 sounds: {len(B1)}, Button2 sounds: {len(B2)}, Hold1 sounds: {len(H1)}, Hold2 sounds: {len(H2)}")
     
     # Connect to ESP32
@@ -333,7 +333,7 @@ def main():
     # Ready
     if LED_AVAILABLE:
         led.value = 0.5  # 50% brightness when ready
-    print("[mattsfx] READY - Waiting for ESP32 button presses", flush=True)
+    print("[WRB] READY - Waiting for ESP32 button presses", flush=True)
     log_event("System ready")
     
     last_scan = time.time()
@@ -346,7 +346,7 @@ def main():
             if (ntag != tag) or (nB1 != B1) or (nB2 != B2) or (nH1 != H1) or (nH2 != H2):
                 tag, B1, B2, H1, H2 = ntag, nB1, nB2, nH1, nH2
                 set_paths(B1, B2, H1, H2)
-                print(f"[mattsfx] reloaded: source={tag} button1={B1[:1]} button2s={len(B2)} hold1={H1[:1]} hold2s={len(H2)}", flush=True)
+                print(f"[WRB] reloaded: source={tag} button1={B1[:1]} button2s={len(B2)} hold1={H1[:1]} hold2s={len(H2)}", flush=True)
                 log_event(f"Audio files reloaded: {tag}")
             last_scan = time.time()
         
@@ -355,7 +355,7 @@ def main():
             line = ser.readline().decode(errors="ignore")
         except Exception as e:
             if connection_status == "connected":
-                print(f"[mattsfx] Serial error: {e}", flush=True)
+                print(f"[WRB] Serial error: {e}", flush=True)
                 log_event(f"Serial error: {e}")
                 connection_status = "error"
             time.sleep(0.05)
@@ -368,61 +368,61 @@ def main():
         # Reset connection status if we're getting data
         if connection_status != "connected":
             connection_status = "connected"
-            print("[mattsfx] Serial connection restored", flush=True)
+            print("[WRB] Serial connection restored", flush=True)
             log_event("Serial connection restored")
         
         # Parse and handle ESP32 messages
         msg_type, full_line = classify_esp32_message(line)
         
         if msg_type == 'B1':
-            print("[mattsfx] Button 1 pressed", flush=True)
+            print("[WRB] Button 1 pressed", flush=True)
             play_button1()
             blink_led()
             log_event("Button 1 pressed")
             
         elif msg_type == 'B2':
-            print("[mattsfx] Button 2 pressed", flush=True)
+            print("[WRB] Button 2 pressed", flush=True)
             play_button2()
             blink_led()
             log_event("Button 2 pressed")
             
         elif msg_type == 'RH':
-            print("[mattsfx] Button 1 held", flush=True)
+            print("[WRB] Button 1 held", flush=True)
             play_hold1()
             blink_led()
             log_event("Button 1 held")
             
         elif msg_type == 'WH':
-            print("[mattsfx] Button 2 held", flush=True)
+            print("[WRB] Button 2 held", flush=True)
             play_hold2()
             blink_led()
             log_event("Button 2 held")
             
         elif msg_type == 'CONNECT':
-            print(f"[mattsfx] ESP32: {full_line}", flush=True)
+            print(f"[WRB] ESP32: {full_line}", flush=True)
             log_event(f"ESP32: {full_line}")
             
         elif msg_type == 'STATUS':
-            print(f"[mattsfx] ESP32 Status: {full_line}", flush=True)
+            print(f"[WRB] ESP32 Status: {full_line}", flush=True)
             
         elif msg_type == 'SECURITY':
-            print(f"[mattsfx] Security Alert: {full_line}", flush=True)
+            print(f"[WRB] Security Alert: {full_line}", flush=True)
             log_event(f"Security: {full_line}")
             
         elif msg_type == 'STARTUP':
-            print(f"[mattsfx] ESP32: {full_line}", flush=True)
+            print(f"[WRB] ESP32: {full_line}", flush=True)
             log_event(f"ESP32: {full_line}")
             
         elif msg_type == 'READY':
-            print(f"[mattsfx] ESP32: {full_line}", flush=True)
+            print(f"[WRB] ESP32: {full_line}", flush=True)
             log_event(f"ESP32: {full_line}")
             
         elif msg_type == 'ERROR':
-            print(f"[mattsfx] ESP32 Error: {full_line}", flush=True)
+            print(f"[WRB] ESP32 Error: {full_line}", flush=True)
             log_event(f"ESP32 Error: {full_line}")
             
         elif full_line.strip():  # Only log non-empty lines
-            print(f"[mattsfx] ESP32: {full_line}", flush=True)
+            print(f"[WRB] ESP32: {full_line}", flush=True)
         
         shutdown_mixer_if_idle()
 
@@ -430,14 +430,14 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n[mattsfx] Shutting down...", flush=True)
+        print("\n[WRB] Shutting down...", flush=True)
         log_event("Script stopped by user")
         if LED_AVAILABLE:
             led.value = 0.0  # Turn off status LED
         if USB_LED_AVAILABLE:
             usb_led.off()
     except Exception as e:
-        print(f"[mattsfx] Fatal error: {e}", flush=True)
+        print(f"[WRB] Fatal error: {e}", flush=True)
         log_event(f"Fatal error: {e}")
         if LED_AVAILABLE:
             led.value = 0.0  # Turn off status LED
