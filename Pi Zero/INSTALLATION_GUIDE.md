@@ -1,6 +1,26 @@
 # ESP32 Wireless Button System - Complete Installation Guide
 
-This guide will help you set up the ESP32 Wireless Button System on a new Raspberry Pi from scratch.
+This guide will help you set up the ESP32 Wireless Button System on a new Raspberry Pi from scratch using the GitHub repository.
+
+## 🚀 Quick Start (GitHub Installation)
+
+For a fast installation using the GitHub repository:
+
+```bash
+# 1. Install dependencies
+sudo apt update && sudo apt install -y python3-pip python3-pygame python3-serial python3-gpiozero sox git
+
+# 2. Clone repository
+git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
+
+# 3. Run automated setup
+cd ~/TheBigWRB
+chmod +x "Pi Zero/setup_wrb_pi.sh"
+cd "Pi Zero"
+./setup_wrb_pi.sh
+```
+
+**That's it!** The automated setup script will handle everything else. Continue reading for detailed manual installation steps.
 
 ## 📋 Prerequisites
 
@@ -17,6 +37,7 @@ This guide will help you set up the ESP32 Wireless Button System on a new Raspbe
 - **Raspberry Pi OS** (Lite or Desktop)
 - **Arduino IDE** with ESP32 board package
 - **Python 3.7+**
+- **Git** (for cloning the repository)
 
 ## 🔧 Hardware Setup
 
@@ -59,7 +80,7 @@ sudo reboot
 #### 1.3 Install System Dependencies
 ```bash
 # Install required system packages
-sudo apt install -y python3-pip python3-pygame python3-serial python3-gpiozero sox
+sudo apt install -y python3-pip python3-pygame python3-serial python3-gpiozero sox git
 
 # Install Python packages
 pip3 install pygame pyserial gpiozero
@@ -89,49 +110,81 @@ speaker-test -t wav -c 2
 3. **Tools → Upload Speed → 115200**
 
 #### 2.3 Find MAC Addresses
-1. Upload the `MAC_Finder.ino` sketch to both ESP32 boards
+1. Upload the `MAC_Finder.ino` sketch (from the repository root) to both ESP32 boards
 2. Open Serial Monitor (115200 baud)
 3. Note the MAC addresses displayed
 
 #### 2.4 Flash ESP32 Code
-1. **Transmitter**: Upload `Transmitter ESP32.c`
-2. **Receiver**: Upload `Receiver ESP32`
+After cloning the repository, upload the ESP32 code:
+1. **Transmitter**: Upload `Transmitter/Transmitter ESP32.c`
+2. **Receiver**: Upload `Receiver/Receiver ESP32`
 
 ## 📁 File Installation
 
-### Step 3: Copy Project Files
+### Step 3: Clone and Install from GitHub
 
-#### 3.1 Create Directory Structure
+#### 3.1 Clone the Repository
 ```bash
+# Clone the repository
+git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
+
+# Navigate to the project directory
+cd ~/TheBigWRB
+```
+
+#### 3.2 Create Working Directory
+```bash
+# Create the working directory for the system
 mkdir -p ~/WRB
 mkdir -p ~/WRB/sounds
 ```
 
-#### 3.2 Copy Main Scripts
+#### 3.3 Copy Pi Zero Files
 ```bash
-# Copy the main Pi script
-cp PiScript ~/WRB/
+# Copy all Pi Zero files to working directory
+cp Pi\ Zero/PiScript ~/WRB/
+cp Pi\ Zero/config.py ~/WRB/
+cp Pi\ Zero/monitor_system.py ~/WRB/
+cp Pi\ Zero/test_esp32_connection.py ~/WRB/
+cp Pi\ Zero/test_system_integration.py ~/WRB/
+cp Pi\ Zero/test_usb_led.py ~/WRB/
+cp Pi\ Zero/verify_configuration.py ~/WRB/
+cp Pi\ Zero/requirements.txt ~/WRB/
+
+# Make scripts executable
 chmod +x ~/WRB/PiScript
-
-# Copy configuration files
-cp config.py ~/WRB/
-cp monitor_system.py ~/WRB/
-```
-
-#### 3.3 Copy Test Scripts
-```bash
-# Copy test and utility scripts
-cp test_esp32_connection.py ~/WRB/
-cp test_system_integration.py ~/WRB/
-cp test_usb_led.py ~/WRB/
-cp verify_configuration.py ~/WRB/
 chmod +x ~/WRB/*.py
 ```
 
-#### 3.4 Copy Service File
+#### 3.4 Install Python Dependencies
 ```bash
-sudo cp WRB-enhanced.service /etc/systemd/system/
+# Install Python requirements
+pip3 install -r ~/WRB/requirements.txt
+```
+
+#### 3.5 Copy Service File
+```bash
+# Copy and install the systemd service
+sudo cp "Pi Zero/WRB-enhanced.service" /etc/systemd/system/
 sudo systemctl daemon-reload
+```
+
+### Alternative: Quick Installation Script
+
+#### Option A: Use the Setup Script
+```bash
+# Make the setup script executable and run it
+chmod +x "Pi Zero/setup_wrb_pi.sh"
+cd "Pi Zero"
+./setup_wrb_pi.sh
+```
+
+#### Option B: Use the Enhanced Installation Script
+```bash
+# Make the enhanced installation script executable and run it
+chmod +x "Pi Zero/install_enhanced.sh"
+cd "Pi Zero"
+./install_enhanced.sh
 ```
 
 ### Step 4: Create Sound Files
@@ -157,7 +210,7 @@ Replace the sample files with your own:
 ### Step 5: Configure MAC Addresses
 
 #### 5.1 Update Receiver Code
-In `Receiver ESP32`, update line 12-15:
+In `Receiver/Receiver ESP32`, update line 12-15:
 ```cpp
 uint8_t ALLOWED_TX_MACS[][6] = {
   { 0x58,0x8C,0x81,0x9F,0x22,0xAC }, // Your transmitter MAC
@@ -166,7 +219,7 @@ uint8_t ALLOWED_TX_MACS[][6] = {
 ```
 
 #### 5.2 Update Transmitter Code  
-In `Transmitter ESP32.c`, update line 17:
+In `Transmitter/Transmitter ESP32.c`, update line 17:
 ```cpp
 uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // Your receiver MAC
 ```
@@ -323,14 +376,70 @@ After installation, your system should have this structure:
 
 ## 🔄 Updates and Maintenance
 
-### Updating the System
+### Updating from GitHub
 ```bash
 # Stop service
 sudo systemctl stop WRB-enhanced.service
 
-# Update files
-cp PiScript ~/WRB/
+# Update repository
+cd ~/TheBigWRB
+git pull origin main
+
+# Update working files
+cp "Pi Zero/PiScript" ~/WRB/
+cp "Pi Zero/config.py" ~/WRB/
+cp "Pi Zero/monitor_system.py" ~/WRB/
+cp "Pi Zero/test_esp32_connection.py" ~/WRB/
+cp "Pi Zero/test_system_integration.py" ~/WRB/
+cp "Pi Zero/test_usb_led.py" ~/WRB/
+cp "Pi Zero/verify_configuration.py" ~/WRB/
+cp "Pi Zero/requirements.txt" ~/WRB/
+
+# Update Python dependencies if needed
+pip3 install -r ~/WRB/requirements.txt --upgrade
+
+# Restart service
 sudo systemctl start WRB-enhanced.service
+```
+
+### Quick Update Script
+```bash
+# Create a simple update script
+cat > ~/WRB/update_system.sh << 'EOF'
+#!/bin/bash
+echo "Updating ESP32 Wireless Button System..."
+
+# Stop service
+sudo systemctl stop WRB-enhanced.service
+
+# Update repository
+cd ~/TheBigWRB
+git pull origin main
+
+# Update files
+cp "Pi Zero/PiScript" ~/WRB/
+cp "Pi Zero/config.py" ~/WRB/
+cp "Pi Zero/monitor_system.py" ~/WRB/
+cp "Pi Zero/test_esp32_connection.py" ~/WRB/
+cp "Pi Zero/test_system_integration.py" ~/WRB/
+cp "Pi Zero/test_usb_led.py" ~/WRB/
+cp "Pi Zero/verify_configuration.py" ~/WRB/
+cp "Pi Zero/requirements.txt" ~/WRB/
+
+# Update dependencies
+pip3 install -r ~/WRB/requirements.txt --upgrade
+
+# Restart service
+sudo systemctl start WRB-enhanced.service
+
+echo "System updated successfully!"
+EOF
+
+# Make it executable
+chmod +x ~/WRB/update_system.sh
+
+# Run updates with:
+# ~/WRB/update_system.sh
 ```
 
 ### Log Management
