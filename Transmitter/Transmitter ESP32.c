@@ -67,7 +67,7 @@ bool pressEvent(BtnDeb& b){
     // Button released
     b.pressed = false;
     b.armed = true;
-    b.holdSent = false;
+    // Don't reset holdSent here - we need to track if hold was sent
     return false;
   }
   
@@ -76,6 +76,7 @@ bool pressEvent(BtnDeb& b){
     b.pressed = true;
     b.pressStartMs = now;
     b.armed = false;
+    b.holdSent = false;  // Reset hold flag for new press
     return true;
   }
   
@@ -268,8 +269,8 @@ void loop(){
 
   // If we're before 5 min idle: normal active mode
   if (ENABLE_SLEEP && (now - lastActivityMs) < IDLE_LIGHT_MS){
-    if (pressEvent(b1)) sendBtn(1);
-    if (USE_BTN2 && pressEvent(b2)) sendBtn(2);
+    if (pressEvent(b1) && !b1.holdSent) sendBtn(1);
+    if (USE_BTN2 && pressEvent(b2) && !b2.holdSent) sendBtn(2);
 
     // Check for hold events
     if (checkHoldEvent(b1)) sendBtnHold(1);

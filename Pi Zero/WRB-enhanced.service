@@ -1,0 +1,21 @@
+[Unit]
+Description=WRB Enhanced Audio System
+After=network.target sound.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/WRB
+Environment=WRB_SERIAL=/dev/ttyACM0
+Environment=SDL_AUDIODRIVER=alsa
+Environment=AUDIODEV=plughw:0,0
+ExecStart=/usr/bin/python3 /home/pi/WRB/PiScript
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
