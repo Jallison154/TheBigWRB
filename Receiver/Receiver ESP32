@@ -31,6 +31,7 @@ uint8_t numTxLinks = 0;
 
 // ---------- Button state tracking ----------
 uint32_t lastBtnActivityMs = 0;
+uint32_t lastHoldActivityMs = 0;
 
 // ---------- MAC validation helper ----------
 bool isAllowedTransmitter(const uint8_t* mac) {
@@ -48,18 +49,38 @@ inline void ledOn(){     ledWriteRaw(255); } // 100% when button received
 inline void ledLinked(){ ledWriteRaw(64);  } // ~25% when linked
 inline void ledOff(){    ledWriteRaw(0);   } // off
 
-void showNoLinkDoubleBlink(uint32_t now){
-  uint32_t t = now % 2000;
-  if (t < 120) { ledOn();  return; }
-  if (t < 240) { ledOff(); return; }
-  if (t < 360) { ledOn();  return; }
-  ledOff();
+void showNoLinkBreathing(uint32_t now){
+  // Create a smooth breathing animation between 0% and 25% brightness
+  // Using a sine wave with 3 second period (3000ms)
+  float phase = (now % 3000) / 3000.0f * 2.0f * PI;
+  float sine = sin(phase);
+  
+  // Map sine wave (-1 to 1) to brightness range (0% to 25%)
+  // sine goes from -1 to 1, we want 0.0 to 0.25
+  // (sine + 1) / 2 goes from 0 to 1
+  // Then scale to 0.0 to 0.25: 0.0 + (0.25 - 0.0) * value
+  float brightness = 0.25f * ((sine + 1.0f) / 2.0f);
+  
+  // Convert to 0-255 range and write to LED
+  uint8_t ledValue = (uint8_t)(brightness * 255);
+  ledWriteRaw(ledValue);
+}
+
+void showHoldDoubleBlink(uint32_t now){
+  // Double blink animation for hold commands
+  // Total duration: 600ms (300ms per blink cycle)
+  uint32_t t = now % 600;
+  if (t < 100) { ledOn();  return; }    // First blink on
+  if (t < 150) { ledOff(); return; }    // First blink off
+  if (t < 250) { ledOn();  return; }    // Second blink on
+  ledOff();                             // Second blink off
 }
 
 void ledTask(){
   uint32_t now = millis();
   bool anyLinked = false;
-  bool recentActivity = (now - lastBtnActivityMs) < 1000; // 1 second after button press
+  bool recentActivity = (now - lastBtnActivityMs) < 100; // 1 second after button press
+  bool recentHoldActivity = (now - lastHoldActivityMs) < 800; // 800ms after hold command
   
   // Check if any transmitters are linked
   for (uint8_t i = 0; i < numTxLinks; i++) {
@@ -69,12 +90,14 @@ void ledTask(){
     }
   }
   
-  if (recentActivity) {
+  if (recentHoldActivity) {
+    showHoldDoubleBlink(now);  // Double blink when hold command received (highest priority)
+  } else if (recentActivity) {
     ledOn();               // 100% when button activity received
   } else if (anyLinked) {
     ledLinked();           // 25% when linked
   } else {
-    showNoLinkDoubleBlink(now);  // Double blink when no links (same as transmitter)
+    showNoLinkBreathing(now);  // Breathing animation when no links
   }
 }
 
@@ -173,7 +196,7 @@ void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len){
                      btnId, info->src_addr[0], info->src_addr[1], info->src_addr[2],
                      info->src_addr[3], info->src_addr[4], info->src_addr[5]);
         
-        lastBtnActivityMs = now;
+        lastHoldActivityMs = now;  // Set hold activity timestamp for double blink
         
         // Send ACK back
         sendAck(info->src_addr);

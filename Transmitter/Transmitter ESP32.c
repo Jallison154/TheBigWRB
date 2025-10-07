@@ -105,23 +105,34 @@ inline void ledOn(){     ledWriteRaw(255); } // 100% when a button is held
 inline void ledLinked(){ ledWriteRaw(64);  } // ~25% when linked
 inline void ledOff(){    ledWriteRaw(0);   } // off
 
-void showNoLinkDoubleBlink(uint32_t now){
-  uint32_t t = now % 2000;
-  if (t < 120) { ledOn();  return; }
-  if (t < 240) { ledOff(); return; }
-  if (t < 360) { ledOn();  return; }
-  ledOff();
+void showNoLinkBreathing(uint32_t now){
+  // Create a smooth breathing animation between 0% and 25% brightness
+  // Using a sine wave with 3 second period (3000ms)
+  float phase = (now % 3000) / 3000.0f * 2.0f * PI;
+  float sine = sin(phase);
+  
+  // Map sine wave (-1 to 1) to brightness range (0% to 25%)
+  // sine goes from -1 to 1, we want 0.0 to 0.25
+  // (sine + 1) / 2 goes from 0 to 1
+  // Then scale to 0.0 to 0.25: 0.0 + (0.25 - 0.0) * value
+  float brightness = 0.25f * ((sine + 1.0f) / 2.0f);
+  
+  // Convert to 0-255 range and write to LED
+  uint8_t ledValue = (uint8_t)(brightness * 255);
+  ledWriteRaw(ledValue);
 }
+
 
 void ledTask(){
   uint32_t now = millis();
-  bool anyLocalHeld = isBtnActive(BTN1_PIN) || (USE_BTN2 && isBtnActive(BTN2_PIN));
+  bool anyLocalHeld = b1.pressed || (USE_BTN2 && b2.pressed);
+  
   if (anyLocalHeld) {
     ledOn();               // 100% while a button is held
   } else if (linked) {
     ledLinked();           // 25% when linked
   } else {
-    showNoLinkDoubleBlink(now);
+    showNoLinkBreathing(now);  // Breathing animation when no links
   }
 }
 
