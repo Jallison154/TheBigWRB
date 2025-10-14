@@ -7,20 +7,23 @@ This guide will help you set up the ESP32 Wireless Button System on a new Raspbe
 For a fast installation using the GitHub repository:
 
 ```bash
-# 1. Install dependencies
-sudo apt update && sudo apt install -y python3-pip python3-pygame python3-serial python3-gpiozero sox git
-
-# 2. Clone repository
+# 1. Clone repository
 git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
 
-# 3. Run automated setup
-cd ~/TheBigWRB
-chmod +x "Pi Zero/setup_wrb_pi.sh"
-cd "Pi Zero"
-./setup_wrb_pi.sh
+# 2. Run automated setup
+cd ~/TheBigWRB/Pi\ Zero
+chmod +x install.sh
+./install.sh
 ```
 
-**That's it!** The automated setup script will handle everything else. Continue reading for detailed manual installation steps.
+**That's it!** The automated installation script will handle everything else including:
+- System updates and package installation
+- File copying and permissions
+- Audio setup and user group configuration
+- Sample sound file creation
+- Systemd service installation and startup
+
+Continue reading for detailed manual installation steps if needed.
 
 ## 📋 Prerequisites
 
@@ -125,12 +128,14 @@ After cloning the repository, upload the ESP32 code:
 
 #### 3.1 Clone the Repository
 ```bash
-# Clone the repository
+# Clone the public repository
 git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
 
 # Navigate to the project directory
 cd ~/TheBigWRB
 ```
+
+**Note**: This is a public repository, so no authentication is required for cloning.
 
 #### 3.2 Create Working Directory
 ```bash

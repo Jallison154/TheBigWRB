@@ -304,6 +304,23 @@ case MSG_BTN_HOLD:  // ⭐ NEW: Handle hold actions
   break;
 ```
 
+## Installation
+
+This project is now **publicly available** on GitHub! 
+
+### Quick Installation
+```bash
+# Clone the repository
+git clone https://github.com/Jallison154/TheBigWRB.git
+
+# Run the automated installation script
+cd TheBigWRB/Pi\ Zero
+chmod +x install.sh
+./install.sh
+```
+
+For detailed installation instructions, see the [Complete Installation Guide](Pi%20Zero/INSTALLATION_GUIDE.md).
+
 ## License
 
 This project is open source. Feel free to modify and distribute as needed.
