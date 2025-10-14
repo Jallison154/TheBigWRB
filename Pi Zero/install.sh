@@ -132,7 +132,38 @@ fi
 
 # Step 9: Install systemd service
 echo "⚙️ Installing systemd service..."
-sudo cp WRB-enhanced.service /etc/systemd/system/
+# Create service file with actual username
+ACTUAL_USER=$(whoami)
+echo "🔧 Using username: $ACTUAL_USER"
+
+sudo tee /etc/systemd/system/WRB-enhanced.service >/dev/null << EOF
+[Unit]
+Description=WRB Enhanced Audio System
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=$ACTUAL_USER
+Group=audio
+WorkingDirectory=/home/$ACTUAL_USER/WRB
+Environment=HOME=/home/$ACTUAL_USER
+Environment=USER=$ACTUAL_USER
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=WRB_SERIAL=/dev/ttyACM0
+Environment=SDL_AUDIODRIVER=alsa
+Environment=AUDIODEV=plughw:0,0
+Environment=ALSA_CARD=0
+Environment=ALSA_DEVICE=0
+ExecStart=/usr/bin/python3 /home/$ACTUAL_USER/WRB/PiScript
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
 # Step 10: Enable and start service
 echo "🚀 Starting service..."
