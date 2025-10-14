@@ -20,16 +20,21 @@ echo "Installing Python dependencies..."
 sudo apt-get update
 sudo apt-get install -y python3-pip python3-pygame python3-serial python3-gpiozero
 
-# Install pygame if not already installed
-pip3 install pygame
+# Install Python dependencies from requirements.txt
+pip3 install -r requirements.txt
 
 # Copy the enhanced script and supporting files
 echo "Installing enhanced Pi script and supporting files..."
-cp Pi_Script_Enhanced.py ~/WRB/
+cp PiScript ~/WRB/
 cp config.py ~/WRB/
+cp monitor_system.py ~/WRB/
 cp test_esp32_connection.py ~/WRB/
-chmod +x ~/WRB/Pi_Script_Enhanced.py
-chmod +x ~/WRB/test_esp32_connection.py
+cp test_system_integration.py ~/WRB/
+cp test_usb_led.py ~/WRB/
+cp verify_configuration.py ~/WRB/
+cp requirements.txt ~/WRB/
+chmod +x ~/WRB/PiScript
+chmod +x ~/WRB/*.py
 
 # Install systemd service
 echo "Installing systemd service..."
