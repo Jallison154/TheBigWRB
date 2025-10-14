@@ -78,7 +78,8 @@ echo "🔊 Setting up audio..."
 sudo usermod -a -G audio $USER
 
 # Create ALSA configuration
-mkdir -p ~/.asoundrc
+# Remove any existing .asoundrc file or directory to prevent conflicts
+rm -rf ~/.asoundrc
 cat > ~/.asoundrc << 'EOF'
 pcm.!default {
     type hw
