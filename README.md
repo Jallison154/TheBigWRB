@@ -308,16 +308,28 @@ case MSG_BTN_HOLD:  // ⭐ NEW: Handle hold actions
 
 This project is now **publicly available** on GitHub! 
 
-### Quick Installation
-```bash
-# Clone the repository
-git clone https://github.com/Jallison154/TheBigWRB.git
+### One-Command Installation
 
-# Run the automated installation script
-cd TheBigWRB/Pi\ Zero
-chmod +x install.sh
-./install.sh
+**Option 1: Direct Install (Recommended)**
+```bash
+curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero/install.sh | bash
 ```
+
+**Option 2: Quick Install**
+```bash
+curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero/quick_install.sh | bash
+```
+
+**Option 3: Clone and Install**
+```bash
+git clone https://github.com/Jallison154/TheBigWRB.git && cd TheBigWRB/Pi\ Zero && chmod +x install.sh && ./install.sh
+```
+
+**Features:**
+- ✅ One-command installation
+- ✅ Default sound files included
+- ✅ Automatic error handling
+- ✅ Complete system setup
 
 For detailed installation instructions, see the [Complete Installation Guide](Pi%20Zero/INSTALLATION_GUIDE.md).
 

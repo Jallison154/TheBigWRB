@@ -2,17 +2,26 @@
 import os, glob, time, random, sys, serial
 from gpiozero import LED
 
+# Import configuration
+try:
+    from config import *
+    print("[WRB] Loaded configuration from config.py", flush=True)
+except ImportError:
+    print("[WRB] config.py not found, using defaults", flush=True)
+    # Default values if config.py not found
+    BAUD=115200
+    SERIAL=os.getenv("WRB_SERIAL","/dev/ttyACM0")
+    READY_PIN=23
+    READY_ACTIVE_LOW=True
+    MIX_FREQ=44100
+    MIX_BUF=512
+    RESCAN_SEC=1.0
+
 # Audio device (your USB card is card0)
 os.environ.setdefault("SDL_AUDIODRIVER","alsa")
 os.environ.setdefault("AUDIODEV","plughw:0,0")
 
-BAUD=115200
-SERIAL=os.getenv("WRB_SERIAL","/dev/ttyACM0")
-READY_PIN=23
-READY_ACTIVE_LOW=True
-MIX_FREQ=44100
-MIX_BUF=512               # a touch more headroom now that keepalive is gone
-RESCAN_SEC=1.0
+print(f"[WRB] Configuration: BAUD={BAUD}, SERIAL={SERIAL}, READY_PIN={READY_PIN}", flush=True)
 
 def usb_mount_dirs():
     base="/media"

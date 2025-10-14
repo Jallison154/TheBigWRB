@@ -19,14 +19,14 @@ This file documents the MAC addresses and pin configurations used in the system.
 # Pi Script Configuration
 BAUD = 115200
 SERIAL = "/dev/ttyACM0"
-READY_PIN = 24
-USB_LED_PIN = 23
+READY_PIN = 23
+USB_LED_PIN = 24
 READY_ACTIVE_LOW = True
 USB_LED_ACTIVE_LOW = True
 
 # Audio Configuration
 MIX_FREQ = 44100
-MIX_BUF = 256
+MIX_BUF = 512
 RESCAN_SEC = 1.0
 IDLE_SHUTOFF_SEC = 1.0
 

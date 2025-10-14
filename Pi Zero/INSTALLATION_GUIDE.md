@@ -2,28 +2,35 @@
 
 This guide will help you set up the ESP32 Wireless Button System on a new Raspberry Pi from scratch using the GitHub repository.
 
-## 🚀 Quick Start (GitHub Installation)
+## 🚀 One-Command Installation
 
-For a fast installation using the GitHub repository:
+Choose your preferred installation method:
 
+### Option 1: Direct Download and Install (Recommended)
 ```bash
-# 1. Clone repository
-git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
+curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero/install.sh | bash
+```
 
-# 2. Run automated setup
-cd ~/TheBigWRB/Pi\ Zero
-chmod +x install.sh
-./install.sh
+### Option 2: Quick Install Script
+```bash
+curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero/quick_install.sh | bash
+```
+
+### Option 3: Clone and Install
+```bash
+# Download and run in one command
+git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB && cd ~/TheBigWRB/Pi\ Zero && chmod +x install.sh && ./install.sh
 ```
 
 **That's it!** The automated installation script will handle everything else including:
 - System updates and package installation
 - File copying and permissions
 - Audio setup and user group configuration
-- Sample sound file creation
+- Default sound file installation (included with the system)
 - Systemd service installation and startup
+- Automatic error handling (Python environment, audio device access)
 
-**Note**: If you encounter a "externally-managed-environment" error during installation, the script will automatically handle it by using apt packages instead of pip.
+**Note**: If you encounter any errors during installation, the script will automatically handle common issues like "externally-managed-environment" and audio device access problems.
 
 Continue reading for detailed manual installation steps if needed.
 
@@ -192,23 +199,29 @@ This script handles everything automatically:
 - Sample sound file creation
 - Systemd service installation and startup
 
-### Step 4: Create Sound Files
+### Step 4: Sound Files
 
-#### 4.1 Generate Sample Sounds
-```bash
-# Create sample button sounds using sox
-sox -n -r 44100 -c 2 ~/WRB/sounds/button1.wav synth 0.5 sine 800 fade h 0.1 0.1
-sox -n -r 44100 -c 2 ~/WRB/sounds/button2.wav synth 0.5 sine 400 fade h 0.1 0.1
-sox -n -r 44100 -c 2 ~/WRB/sounds/hold1.wav synth 1.0 sine 1000 fade h 0.1 0.1
-sox -n -r 44100 -c 2 ~/WRB/sounds/hold2.wav synth 1.0 sine 600 fade h 0.1 0.1
-```
+#### 4.1 Default Sound Files (Included)
+The system comes with default sound files that are automatically installed:
+- `button1.wav` - Button 1 quick press sound
+- `button2.wav` - Button 2 quick press sound  
+- `hold1.wav` - Button 1 hold sound
+- `hold2.wav` - Button 2 hold sound
+
+These files are copied to `~/WRB/sounds/` during installation.
 
 #### 4.2 Custom Sound Files (Optional)
-Replace the sample files with your own:
+You can replace the default files with your own:
 - `button1*.wav` - Button 1 quick press sounds
 - `button2*.wav` - Button 2 quick press sounds  
 - `hold1*.wav` - Button 1 hold sounds
 - `hold2*.wav` - Button 2 hold sounds
+
+**File Requirements:**
+- Format: WAV files
+- Sample Rate: 44100 Hz (recommended)
+- Channels: Mono or Stereo
+- Bit Depth: 16-bit (recommended)
 
 ## ⚙️ Configuration
 
@@ -389,6 +402,11 @@ Pi Zero/
 ├── test_system_integration.py  # Integration test
 ├── requirements.txt            # Dependencies
 ├── WRB-enhanced.service        # Systemd service
+├── default_sounds/             # Default audio files
+│   ├── button1.wav
+│   ├── button2.wav
+│   ├── hold1.wav
+│   └── hold2.wav
 └── INSTALLATION_GUIDE.md       # This guide
 ```
 

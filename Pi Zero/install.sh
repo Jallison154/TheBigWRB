@@ -15,10 +15,25 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
-# Check if we're in the right directory
+# Auto-detect and navigate to the correct directory
 if [ ! -f "PiScript" ]; then
-    echo "❌ PiScript not found. Please run this from the Pi Zero directory."
-    exit 1
+    echo "🔍 PiScript not found in current directory, searching..."
+    
+    # Try common locations
+    if [ -f "Pi Zero/PiScript" ]; then
+        echo "📁 Found in Pi Zero subdirectory, navigating..."
+        cd "Pi Zero"
+    elif [ -f "../Pi Zero/PiScript" ]; then
+        echo "📁 Found in parent Pi Zero directory, navigating..."
+        cd "../Pi Zero"
+    elif [ -f "~/TheBigWRB/Pi Zero/PiScript" ]; then
+        echo "📁 Found in TheBigWRB directory, navigating..."
+        cd "~/TheBigWRB/Pi Zero"
+    else
+        echo "❌ PiScript not found. Please run this from the Pi Zero directory or clone the repository first."
+        echo "   Try: git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB"
+        exit 1
+    fi
 fi
 
 echo "✅ Starting WRB Pi installation..."
@@ -91,19 +106,28 @@ ctl.!default {
 }
 EOF
 
-# Step 8: Create sample sound files
-echo "🎵 Creating sample sound files..."
-if [ ! -f ~/WRB/sounds/button1.wav ]; then
-    sox -n -r 44100 -c 2 ~/WRB/sounds/button1.wav synth 0.5 sine 800 fade h 0.1 0.1
-fi
-if [ ! -f ~/WRB/sounds/button2.wav ]; then
-    sox -n -r 44100 -c 2 ~/WRB/sounds/button2.wav synth 0.5 sine 400 fade h 0.1 0.1
-fi
-if [ ! -f ~/WRB/sounds/hold1.wav ]; then
-    sox -n -r 44100 -c 2 ~/WRB/sounds/hold1.wav synth 1.0 sine 1000 fade h 0.1 0.1
-fi
-if [ ! -f ~/WRB/sounds/hold2.wav ]; then
-    sox -n -r 44100 -c 2 ~/WRB/sounds/hold2.wav synth 1.0 sine 600 fade h 0.1 0.1
+# Step 8: Install default sound files
+echo "🎵 Installing default sound files..."
+# Copy default sound files if they exist
+if [ -d "default_sounds" ]; then
+    echo "📁 Found default sound files, copying..."
+    cp default_sounds/*.wav ~/WRB/sounds/ 2>/dev/null || echo "⚠️  Could not copy default sounds"
+    echo "✅ Default sound files installed"
+else
+    echo "📁 No default sounds found, creating sample files..."
+    # Fallback to creating sample sounds if default files not available
+    if [ ! -f ~/WRB/sounds/button1.wav ]; then
+        sox -n -r 44100 -c 2 ~/WRB/sounds/button1.wav synth 0.5 sine 800 fade h 0.1 0.1 2>/dev/null || echo "⚠️  sox not available, skipping sample sound creation"
+    fi
+    if [ ! -f ~/WRB/sounds/button2.wav ]; then
+        sox -n -r 44100 -c 2 ~/WRB/sounds/button2.wav synth 0.5 sine 400 fade h 0.1 0.1 2>/dev/null || echo "⚠️  sox not available, skipping sample sound creation"
+    fi
+    if [ ! -f ~/WRB/sounds/hold1.wav ]; then
+        sox -n -r 44100 -c 2 ~/WRB/sounds/hold1.wav synth 1.0 sine 1000 fade h 0.1 0.1 2>/dev/null || echo "⚠️  sox not available, skipping sample sound creation"
+    fi
+    if [ ! -f ~/WRB/sounds/hold2.wav ]; then
+        sox -n -r 44100 -c 2 ~/WRB/sounds/hold2.wav synth 1.0 sine 600 fade h 0.1 0.1 2>/dev/null || echo "⚠️  sox not available, skipping sample sound creation"
+    fi
 fi
 
 # Step 9: Install systemd service
