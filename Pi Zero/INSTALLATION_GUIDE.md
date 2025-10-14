@@ -147,8 +147,6 @@ cp Pi\ Zero/config.py ~/WRB/
 cp Pi\ Zero/monitor_system.py ~/WRB/
 cp Pi\ Zero/test_esp32_connection.py ~/WRB/
 cp Pi\ Zero/test_system_integration.py ~/WRB/
-cp Pi\ Zero/test_usb_led.py ~/WRB/
-cp Pi\ Zero/verify_configuration.py ~/WRB/
 cp Pi\ Zero/requirements.txt ~/WRB/
 
 # Make scripts executable
@@ -169,23 +167,23 @@ sudo cp "Pi Zero/WRB-enhanced.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
-### Alternative: Quick Installation Script
+### Alternative: Automated Installation Script
 
-#### Option A: Use the Setup Script
+Use the single, comprehensive installation script:
+
 ```bash
-# Make the setup script executable and run it
-chmod +x "Pi Zero/setup_wrb_pi.sh"
+# Make the installation script executable and run it
+chmod +x "Pi Zero/install.sh"
 cd "Pi Zero"
-./setup_wrb_pi.sh
+./install.sh
 ```
 
-#### Option B: Use the Enhanced Installation Script
-```bash
-# Make the enhanced installation script executable and run it
-chmod +x "Pi Zero/install_enhanced.sh"
-cd "Pi Zero"
-./install_enhanced.sh
-```
+This script handles everything automatically:
+- System updates and package installation
+- File copying and permissions
+- Audio setup and user group configuration
+- Sample sound file creation
+- Systemd service installation and startup
 
 ### Step 4: Create Sound Files
 
@@ -365,13 +363,26 @@ After installation, your system should have this structure:
 ├── monitor_system.py           # System monitoring
 ├── test_esp32_connection.py    # ESP32 connection test
 ├── test_system_integration.py  # Integration tests
-├── test_usb_led.py            # USB LED test
-├── verify_configuration.py    # Configuration verification
+├── requirements.txt            # Python dependencies
 └── sounds/                    # Sound files directory
     ├── button1.wav
     ├── button2.wav
     ├── hold1.wav
     └── hold2.wav
+```
+
+### Pi Zero Directory (Source Files)
+```
+Pi Zero/
+├── install.sh                  # Single installation script
+├── PiScript                    # Main application
+├── config.py                   # Configuration
+├── monitor_system.py           # System monitoring
+├── test_esp32_connection.py    # ESP32 test
+├── test_system_integration.py  # Integration test
+├── requirements.txt            # Dependencies
+├── WRB-enhanced.service        # Systemd service
+└── INSTALLATION_GUIDE.md       # This guide
 ```
 
 ## 🔄 Updates and Maintenance
@@ -391,8 +402,6 @@ cp "Pi Zero/config.py" ~/WRB/
 cp "Pi Zero/monitor_system.py" ~/WRB/
 cp "Pi Zero/test_esp32_connection.py" ~/WRB/
 cp "Pi Zero/test_system_integration.py" ~/WRB/
-cp "Pi Zero/test_usb_led.py" ~/WRB/
-cp "Pi Zero/verify_configuration.py" ~/WRB/
 cp "Pi Zero/requirements.txt" ~/WRB/
 
 # Update Python dependencies if needed
