@@ -31,7 +31,7 @@ sudo apt upgrade -y
 
 # Step 2: Install required packages
 echo "📦 Installing required packages..."
-sudo apt install -y python3-pip python3-pygame python3-serial python3-gpiozero sox git alsa-utils
+sudo apt install -y python3-pip python3-pygame python3-serial python3-gpiozero sox git alsa-utils python3-venv
 
 # Step 3: Create directory structure
 echo "📁 Creating directory structure..."
@@ -53,7 +53,25 @@ chmod +x ~/WRB/*.py
 
 # Step 6: Install Python dependencies
 echo "🐍 Installing Python dependencies..."
-pip3 install -r ~/WRB/requirements.txt
+# Try pip first, fall back to apt if externally managed environment
+if ! pip3 install -r ~/WRB/requirements.txt 2>/dev/null; then
+    echo "⚠️  pip install failed (externally managed environment detected)"
+    echo "📦 Installing Python packages via apt instead..."
+    
+    # Install the specific packages we need via apt
+    sudo apt install -y python3-pygame python3-serial python3-gpiozero
+    
+    # Check if pygame is working
+    python3 -c "import pygame; print('pygame version:', pygame.version.ver)" 2>/dev/null || {
+        echo "⚠️  pygame not found, trying alternative installation..."
+        # Try using --break-system-packages as last resort
+        pip3 install pygame --break-system-packages 2>/dev/null || echo "❌ Could not install pygame"
+    }
+    
+    echo "✅ Python packages installed via apt"
+else
+    echo "✅ Python packages installed via pip"
+fi
 
 # Step 7: Audio setup
 echo "🔊 Setting up audio..."

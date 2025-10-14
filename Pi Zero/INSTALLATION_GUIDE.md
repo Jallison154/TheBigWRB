@@ -23,6 +23,8 @@ chmod +x install.sh
 - Sample sound file creation
 - Systemd service installation and startup
 
+**Note**: If you encounter a "externally-managed-environment" error during installation, the script will automatically handle it by using apt packages instead of pip.
+
 Continue reading for detailed manual installation steps if needed.
 
 ## 📋 Prerequisites
@@ -490,6 +492,75 @@ python3 ~/WRB/test_system_integration.py
 - **Main Script**: `~/WRB/PiScript`
 - **Configuration**: `~/WRB/config.py`
 - **Logs**: `~/WRB/*.txt`
+
+---
+
+## 🔧 Troubleshooting
+
+### Python "Externally Managed Environment" Error
+
+If you encounter this error during installation:
+```
+error: externally-managed-environment
+```
+
+**Solution**: The installation script automatically handles this, but if you need to fix it manually:
+
+```bash
+# Run the Python environment fix script
+chmod +x fix_python_environment.sh
+./fix_python_environment.sh
+```
+
+**Or manually install packages via apt:**
+```bash
+sudo apt install -y python3-pygame python3-serial python3-gpiozero
+```
+
+### Service Not Starting
+
+If the WRB-enhanced.service fails to start:
+
+```bash
+# Check service status
+sudo systemctl status WRB-enhanced.service
+
+# View detailed logs
+sudo journalctl -u WRB-enhanced.service -f
+
+# Check if files exist and have correct permissions
+ls -la ~/WRB/PiScript
+```
+
+### Audio Issues
+
+If you don't hear sounds:
+
+```bash
+# Check if user is in audio group
+groups $USER
+
+# Test audio device
+aplay -l
+
+# Test with a simple sound
+speaker-test -t wav -c 2
+```
+
+### ESP32 Connection Issues
+
+If the ESP32 receiver isn't detected:
+
+```bash
+# Check USB devices
+lsusb
+
+# Check serial ports
+ls /dev/ttyACM* /dev/ttyUSB*
+
+# Test ESP32 connection
+python3 ~/WRB/test_esp32_connection.py
+```
 
 ---
 
