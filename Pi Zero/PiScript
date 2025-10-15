@@ -45,12 +45,46 @@ def pick_source():
     return ("LOCAL", local, B1[:1], B2, H1[:1], H2)
 
 def load_sounds(B1, B2, H1, H2):
-    import pygame
-    button1 = pygame.mixer.Sound(B1[0]) if B1 and os.path.exists(B1[0]) else None
-    button2 = [pygame.mixer.Sound(p) for p in B2 if os.path.exists(p)]
-    hold1 = pygame.mixer.Sound(H1[0]) if H1 and os.path.exists(H1[0]) else None
-    hold2 = [pygame.mixer.Sound(p) for p in H2 if os.path.exists(p)]
+    """Load sound file paths - actual Sound objects created on-demand"""
+    # Just return the file paths, not pygame Sound objects
+    button1 = B1[0] if B1 and os.path.exists(B1[0]) else None
+    button2 = [p for p in B2 if os.path.exists(p)]
+    hold1 = H1[0] if H1 and os.path.exists(H1[0]) else None
+    hold2 = [p for p in H2 if os.path.exists(p)]
     return button1, button2, hold1, hold2
+
+def play_sound(sound_path, channel=0):
+    """Play a sound file on-demand with mixer initialization"""
+    import pygame
+    if not sound_path:
+        return False
+    
+    if ensure_mixer():
+        try:
+            sound = pygame.mixer.Sound(sound_path)
+            pygame.mixer.Channel(channel).play(sound)
+            return True
+        except Exception as e:
+            print(f"[WRB] Playback failed: {e}", flush=True)
+            return False
+    return False
+
+def play_random_sound(sound_paths, channel=1):
+    """Play a random sound from a list of paths"""
+    import pygame
+    if not sound_paths:
+        return False
+    
+    if ensure_mixer():
+        try:
+            sound_path = random.choice(sound_paths)
+            sound = pygame.mixer.Sound(sound_path)
+            pygame.mixer.Channel(channel).play(sound)
+            return True
+        except Exception as e:
+            print(f"[WRB] Random playback failed: {e}", flush=True)
+            return False
+    return False
 
 def classify(s):
     u=s.strip().upper()
@@ -159,8 +193,7 @@ def main():
             
         t=classify(line)
         if t=='B1':
-            if BUTTON1 and ensure_mixer(): 
-                pygame.mixer.Channel(0).play(BUTTON1)
+            if play_sound(BUTTON1, channel=0): 
                 last_play_time = time.time()
             print("[WRB] BUTTON1 (src=%s loaded=%s)"%(src_tag,bool(BUTTON1)), flush=True)
             try: 
@@ -171,8 +204,7 @@ def main():
                 led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
         elif t=='B2':
-            if BUTTON2 and ensure_mixer(): 
-                pygame.mixer.Channel(1).play(random.choice(BUTTON2))
+            if play_random_sound(BUTTON2, channel=1): 
                 last_play_time = time.time()
             print("[WRB] BUTTON2 (src=%s loaded=%d)"%(src_tag,len(BUTTON2)), flush=True)
             try: 
@@ -183,8 +215,7 @@ def main():
                 led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
         elif t=='H1':
-            if HOLD1 and ensure_mixer(): 
-                pygame.mixer.Channel(2).play(HOLD1)
+            if play_sound(HOLD1, channel=2): 
                 last_play_time = time.time()
             print("[WRB] HOLD1 (src=%s loaded=%s)"%(src_tag,bool(HOLD1)), flush=True)
             try: 
@@ -195,8 +226,7 @@ def main():
                 led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
         elif t=='H2':
-            if HOLD2 and ensure_mixer(): 
-                pygame.mixer.Channel(3).play(random.choice(HOLD2))
+            if play_random_sound(HOLD2, channel=3): 
                 last_play_time = time.time()
             print("[WRB] HOLD2 (src=%s loaded=%d)"%(src_tag,len(HOLD2)), flush=True)
             try: 
