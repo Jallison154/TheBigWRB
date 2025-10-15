@@ -211,16 +211,16 @@ StartLimitBurst=3
 
 [Service]
 Type=simple
-User=$ACTUAL_USER
+User=wrb01
 Group=audio
-WorkingDirectory=/home/$ACTUAL_USER/WRB
-Environment=HOME=/home/$ACTUAL_USER
-Environment=USER=$ACTUAL_USER
+WorkingDirectory=/home/wrb01/WRB
+Environment=HOME=/home/wrb01
+Environment=USER=wrb01
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=WRB_SERIAL=/dev/ttyACM0
 Environment=SDL_AUDIODRIVER=pulse
 Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
-ExecStart=/usr/bin/python3 /home/$ACTUAL_USER/WRB/PiScript
+ExecStart=/usr/bin/python3 /home/wrb01/WRB/PiScript
 Restart=always
 RestartSec=3
 StartLimitInterval=60
