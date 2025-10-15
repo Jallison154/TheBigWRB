@@ -8,8 +8,9 @@ sudo tee /etc/systemd/system/WRB-enhanced.service > /dev/null << 'SERVICE_EOF'
 Description=WRB Enhanced Audio System
 After=network.target sound.target
 Wants=network.target sound.target
-StartLimitInterval=60
+StartLimitInterval=300
 StartLimitBurst=3
+StartLimitAction=none
 
 [Service]
 Type=simple
@@ -23,10 +24,13 @@ Environment=WRB_SERIAL=/dev/ttyACM0
 Environment=SDL_AUDIODRIVER=pulse
 Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
 ExecStart=/usr/bin/python3 /home/wrb01/WRB/PiScript
-Restart=always
-RestartSec=3
+Restart=on-failure
+RestartSec=10
+RestartPreventExitStatus=1
 StandardOutput=journal
 StandardError=journal
+TimeoutStartSec=30
+TimeoutStopSec=10
 
 [Install]
 WantedBy=multi-user.target

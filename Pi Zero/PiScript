@@ -70,6 +70,7 @@ def ensure_mixer():
             print("[WRB] audio: mixer opened on-demand", flush=True)
         except Exception as e:
             print(f"[WRB] audio init failed: {e}", flush=True)
+            # Don't crash - continue without audio
             return False
     return True
 
@@ -207,4 +208,12 @@ def main():
             except: pass
 
 if __name__=="__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("[WRB] Shutdown requested by user", flush=True)
+        sys.exit(0)
+    except Exception as e:
+        print(f"[WRB] Fatal error: {e}", flush=True)
+        # Exit with code 1 to trigger restart (but not if we've restarted too many times)
+        sys.exit(1)
