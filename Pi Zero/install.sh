@@ -63,32 +63,69 @@ if [ ! -d ".git" ]; then
 else
     echo "✅ Git repository already exists"
 fi
-cd ~
+# Don't change back to ~ yet - stay in the script directory
 
 # Step 4: Copy all files
 echo "📋 Copying application files..."
 
-# Get the directory where this script is located
+# Get the directory where this script is located (should be Pi Zero directory)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "🔍 Script directory: $SCRIPT_DIR"
+
+# List files in the script directory to debug
+echo "📁 Files in script directory:"
+ls -la "$SCRIPT_DIR" | grep -E "\.(py|txt)$|PiScript" || echo "No Python files found"
 
 # Copy files from the Pi Zero directory
-cp "$SCRIPT_DIR/PiScript" ~/WRB/ 2>/dev/null || echo "⚠️  PiScript not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/config.py" ~/WRB/ 2>/dev/null || echo "⚠️  config.py not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/monitor_system.py" ~/WRB/ 2>/dev/null || echo "⚠️  monitor_system.py not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/test_esp32_connection.py" ~/WRB/ 2>/dev/null || echo "⚠️  test_esp32_connection.py not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/test_system_integration.py" ~/WRB/ 2>/dev/null || echo "⚠️  test_system_integration.py not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/requirements.txt" ~/WRB/ 2>/dev/null || echo "⚠️  requirements.txt not found in $SCRIPT_DIR"
+echo "📋 Copying files..."
+cp "$SCRIPT_DIR/PiScript" ~/WRB/ 2>/dev/null && echo "✅ PiScript copied" || echo "⚠️  PiScript not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/config.py" ~/WRB/ 2>/dev/null && echo "✅ config.py copied" || echo "⚠️  config.py not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/monitor_system.py" ~/WRB/ 2>/dev/null && echo "✅ monitor_system.py copied" || echo "⚠️  monitor_system.py not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/test_esp32_connection.py" ~/WRB/ 2>/dev/null && echo "✅ test_esp32_connection.py copied" || echo "⚠️  test_esp32_connection.py not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/test_system_integration.py" ~/WRB/ 2>/dev/null && echo "✅ test_system_integration.py copied" || echo "⚠️  test_system_integration.py not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/requirements.txt" ~/WRB/ 2>/dev/null && echo "✅ requirements.txt copied" || echo "⚠️  requirements.txt not found in $SCRIPT_DIR"
 
 # Copy default sound files if they exist
 if [ -d "$SCRIPT_DIR/default_sounds" ]; then
     echo "🎵 Copying default sound files..."
-    cp "$SCRIPT_DIR/default_sounds"/*.wav ~/WRB/sounds/ 2>/dev/null || echo "⚠️  Could not copy default sounds"
+    cp "$SCRIPT_DIR/default_sounds"/*.wav ~/WRB/sounds/ 2>/dev/null && echo "✅ Default sounds copied" || echo "⚠️  Could not copy default sounds"
+else
+    echo "📁 No default_sounds directory found in $SCRIPT_DIR"
 fi
 
 # Step 5: Set permissions
 echo "🔐 Setting file permissions..."
-chmod +x ~/WRB/PiScript
-chmod +x ~/WRB/*.py
+
+# Check if files were copied successfully, if not try alternative locations
+if [ ! -f ~/WRB/PiScript ]; then
+    echo "⚠️  PiScript not found, trying alternative locations..."
+    
+    # Try copying from the TheBigWRB/Pi Zero directory
+    if [ -f ~/TheBigWRB/Pi\ Zero/PiScript ]; then
+        echo "📁 Found files in ~/TheBigWRB/Pi Zero/, copying..."
+        cp ~/TheBigWRB/Pi\ Zero/PiScript ~/WRB/ 2>/dev/null && echo "✅ PiScript copied from TheBigWRB"
+        cp ~/TheBigWRB/Pi\ Zero/config.py ~/WRB/ 2>/dev/null && echo "✅ config.py copied from TheBigWRB"
+        cp ~/TheBigWRB/Pi\ Zero/monitor_system.py ~/WRB/ 2>/dev/null && echo "✅ monitor_system.py copied from TheBigWRB"
+        cp ~/TheBigWRB/Pi\ Zero/test_esp32_connection.py ~/WRB/ 2>/dev/null && echo "✅ test_esp32_connection.py copied from TheBigWRB"
+        cp ~/TheBigWRB/Pi\ Zero/test_system_integration.py ~/WRB/ 2>/dev/null && echo "✅ test_system_integration.py copied from TheBigWRB"
+        cp ~/TheBigWRB/Pi\ Zero/requirements.txt ~/WRB/ 2>/dev/null && echo "✅ requirements.txt copied from TheBigWRB"
+        
+        # Copy default sounds if they exist
+        if [ -d ~/TheBigWRB/Pi\ Zero/default_sounds ]; then
+            cp ~/TheBigWRB/Pi\ Zero/default_sounds/*.wav ~/WRB/sounds/ 2>/dev/null && echo "✅ Default sounds copied from TheBigWRB"
+        fi
+    fi
+fi
+
+# Set permissions for all files
+if [ -f ~/WRB/PiScript ]; then
+    chmod +x ~/WRB/PiScript
+    echo "✅ PiScript permissions set"
+else
+    echo "❌ PiScript still not found after all attempts"
+fi
+
+chmod +x ~/WRB/*.py 2>/dev/null && echo "✅ Python files permissions set" || echo "⚠️  No Python files found to set permissions"
 
 # Step 6: Install Python dependencies
 echo "🐍 Installing Python dependencies..."
