@@ -45,46 +45,13 @@ def pick_source():
     return ("LOCAL", local, B1[:1], B2, H1[:1], H2)
 
 def load_sounds(B1, B2, H1, H2):
-    """Load sound file paths - actual Sound objects created on-demand"""
-    # Just return the file paths, not pygame Sound objects
-    button1 = B1[0] if B1 and os.path.exists(B1[0]) else None
-    button2 = [p for p in B2 if os.path.exists(p)]
-    hold1 = H1[0] if H1 and os.path.exists(H1[0]) else None
-    hold2 = [p for p in H2 if os.path.exists(p)]
+    """Load pygame Sound objects - keep them in memory for instant playback"""
+    import pygame
+    button1 = pygame.mixer.Sound(B1[0]) if B1 and os.path.exists(B1[0]) else None
+    button2 = [pygame.mixer.Sound(p) for p in B2 if os.path.exists(p)]
+    hold1 = pygame.mixer.Sound(H1[0]) if H1 and os.path.exists(H1[0]) else None
+    hold2 = [pygame.mixer.Sound(p) for p in H2 if os.path.exists(p)]
     return button1, button2, hold1, hold2
-
-def play_sound(sound_path, channel=0):
-    """Play a sound file on-demand with mixer initialization"""
-    import pygame
-    if not sound_path:
-        return False
-    
-    if ensure_mixer():
-        try:
-            sound = pygame.mixer.Sound(sound_path)
-            pygame.mixer.Channel(channel).play(sound)
-            return True
-        except Exception as e:
-            print(f"[WRB] Playback failed: {e}", flush=True)
-            return False
-    return False
-
-def play_random_sound(sound_paths, channel=1):
-    """Play a random sound from a list of paths"""
-    import pygame
-    if not sound_paths:
-        return False
-    
-    if ensure_mixer():
-        try:
-            sound_path = random.choice(sound_paths)
-            sound = pygame.mixer.Sound(sound_path)
-            pygame.mixer.Channel(channel).play(sound)
-            return True
-        except Exception as e:
-            print(f"[WRB] Random playback failed: {e}", flush=True)
-            return False
-    return False
 
 def classify(s):
     u=s.strip().upper()
@@ -94,28 +61,17 @@ def classify(s):
     if "BTN2" in u: return 'B2'
     return None
 
-def ensure_mixer():
-    """On-demand mixer initialization - only opens audio when needed"""
+def init_audio():
+    """Initialize pygame mixer once and keep it open"""
     import pygame
-    if not pygame.mixer.get_init():
-        try:
-            pygame.mixer.init(frequency=MIX_FREQ, size=-16, channels=2, buffer=256)
-            pygame.mixer.set_num_channels(16)
-            print("[WRB] audio: mixer opened on-demand", flush=True)
-        except Exception as e:
-            print(f"[WRB] audio init failed: {e}", flush=True)
-            # Don't crash - continue without audio
-            return False
-    return True
-
-def close_if_idle(last_play_time):
-    """Close audio device after inactivity to prevent always streaming"""
-    import pygame
-    if pygame.mixer.get_init():
-        time_since_last = time.time() - last_play_time
-        if time_since_last > 1.0 and not pygame.mixer.get_busy():
-            pygame.mixer.quit()
-            print("[WRB] audio: mixer closed (idle)", flush=True)
+    try:
+        pygame.mixer.init(frequency=MIX_FREQ, size=-16, channels=2, buffer=MIX_BUF)
+        pygame.mixer.set_num_channels(16)
+        print("[WRB] audio: mixer ready", flush=True)
+        return True
+    except Exception as e:
+        print(f"[WRB] audio init failed: {e}", flush=True)
+        return False
 
 def wait_serial():
     prefs=[SERIAL,"/dev/ttyACM0","/dev/ttyACM1","/dev/ttyUSB0","/dev/ttyUSB1","/dev/serial0","/dev/ttyAMA0","/dev/ttyS0"]
@@ -150,6 +106,10 @@ def main():
     # Quick breathing LED during startup (faster)
     breathing_led(led, duration=0.8, steps=8)
     
+    print("[WRB] Initializing audio...", flush=True)
+    if not init_audio():
+        print("[WRB] Audio initialization failed, continuing without audio", flush=True)
+    
     print("[WRB] Loading sound files...", flush=True)
     src_tag, base, B1, B2, H1, H2 = pick_source()
     BUTTON1, BUTTON2, HOLD1, HOLD2 = load_sounds(B1, B2, H1, H2)
@@ -165,9 +125,8 @@ def main():
     else:
         led.value = 0.25  # 25% brightness for active high
     
-    print("[WRB] READY - LED at 25% brightness (audio on-demand)", flush=True)
+    print("[WRB] READY - LED at 25% brightness", flush=True)
     last_scan=time.time()
-    last_play_time=0  # Track when audio was last played
 
     while True:
         # Hot-swap USB/local
@@ -181,20 +140,12 @@ def main():
             last_scan=time.time()
 
         try: line=ser.readline().decode(errors="ignore")
-        except Exception: 
-            # Check for idle audio shutdown
-            close_if_idle(last_play_time)
-            time.sleep(0.05)
-            continue
-        if not line: 
-            # Check for idle audio shutdown
-            close_if_idle(last_play_time)
-            continue
+        except Exception: time.sleep(0.05); continue
+        if not line: continue
             
         t=classify(line)
         if t=='B1':
-            if play_sound(BUTTON1, channel=0): 
-                last_play_time = time.time()
+            if BUTTON1: pygame.mixer.Channel(0).play(BUTTON1)
             print("[WRB] BUTTON1 (src=%s loaded=%s)"%(src_tag,bool(BUTTON1)), flush=True)
             try: 
                 # Blink to 100% brightness
@@ -204,8 +155,7 @@ def main():
                 led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
         elif t=='B2':
-            if play_random_sound(BUTTON2, channel=1): 
-                last_play_time = time.time()
+            if BUTTON2: pygame.mixer.Channel(1).play(random.choice(BUTTON2))
             print("[WRB] BUTTON2 (src=%s loaded=%d)"%(src_tag,len(BUTTON2)), flush=True)
             try: 
                 # Blink to 100% brightness
@@ -215,8 +165,7 @@ def main():
                 led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
         elif t=='H1':
-            if play_sound(HOLD1, channel=2): 
-                last_play_time = time.time()
+            if HOLD1: pygame.mixer.Channel(2).play(HOLD1)
             print("[WRB] HOLD1 (src=%s loaded=%s)"%(src_tag,bool(HOLD1)), flush=True)
             try: 
                 # Blink to 100% brightness
@@ -226,8 +175,7 @@ def main():
                 led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
         elif t=='H2':
-            if play_random_sound(HOLD2, channel=3): 
-                last_play_time = time.time()
+            if HOLD2: pygame.mixer.Channel(3).play(random.choice(HOLD2))
             print("[WRB] HOLD2 (src=%s loaded=%d)"%(src_tag,len(HOLD2)), flush=True)
             try: 
                 # Blink to 100% brightness

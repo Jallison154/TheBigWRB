@@ -14,7 +14,7 @@ const bool USE_BTN2 = true;
 const bool BTN_ACTIVE_LOW = true;  // true = button to GND with INPUT_PULLUP
 
 // ---------- Peer (Receiver) MAC ----------
-uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // <-- your RX MAC (this should be the receiver's MAC)
+uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // <-- your RX MAC (58:8c:81:9e:30:10)
 
 // ---------- Messages ----------
 enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0, MSG_BTN_HOLD=0xB1 };
@@ -102,6 +102,23 @@ inline void ledOn(){     ledWriteRaw(255); } // 100% when a button is held
 inline void ledLinked(){ ledWriteRaw(64);  } // ~25% when linked
 inline void ledOff(){    ledWriteRaw(0);   } // off
 
+void showNoLinkBreathing(uint32_t now){
+  // Create a smooth breathing animation between 0% and 25% brightness
+  // Using a sine wave with 3 second period (3000ms)
+  float phase = (now % 3000) / 3000.0f * 2.0f * PI;
+  float sine = sin(phase);
+  
+  // Map sine wave (-1 to 1) to brightness range (0% to 25%)
+  // sine goes from -1 to 1, we want 0.0 to 0.25
+  // (sine + 1) / 2 goes from 0 to 1
+  // Then scale to 0.0 to 0.25: 0.0 + (0.25 - 0.0) * value
+  float brightness = 0.25f * ((sine + 1.0f) / 2.0f);
+  
+  // Convert to 0-255 range and write to LED
+  uint8_t ledValue = (uint8_t)(brightness * 255);
+  ledWriteRaw(ledValue);
+}
+
 void showNoLinkDoubleBlink(uint32_t now){
   uint32_t t = now % 2000;
   if (t < 120) { ledOn();  return; }
@@ -118,7 +135,7 @@ void ledTask(){
   } else if (linked) {
     ledLinked();           // 25% when linked
   } else {
-    showNoLinkDoubleBlink(now);
+    showNoLinkBreathing(now);  // Breathing animation when no connection
   }
 }
 
