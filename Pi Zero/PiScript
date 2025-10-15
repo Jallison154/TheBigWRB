@@ -62,14 +62,17 @@ def classify(s):
 
 def init_audio():
     import pygame
-    for i in range(10):
+    # Try only 3 times with shorter delays for faster startup
+    for i in range(3):
         try:
             pygame.mixer.init(frequency=MIX_FREQ,size=-16,channels=2,buffer=MIX_BUF)
             pygame.mixer.set_num_channels(16)
             print("[WRB] audio: mixer ready", flush=True)
             return
         except Exception as e:
-            print(f"[WRB] audio init retry {i+1}: {e}", flush=True); time.sleep(0.5)
+            print(f"[WRB] audio init retry {i+1}: {e}", flush=True)
+            if i < 2:  # Don't sleep on last attempt
+                time.sleep(0.1)
     raise SystemExit("audio init failed")
 
 def wait_serial():
@@ -79,7 +82,7 @@ def wait_serial():
         for p in prefs:
             try: return serial.Serial(p, BAUD, timeout=0.1)
             except: pass
-        time.sleep(0.3)
+        time.sleep(0.1)  # Reduced from 0.3 to 0.1 seconds
 
 def breathing_led(led, duration=2.0, steps=20):
     """Breathing LED effect from 0 to 100% brightness"""
@@ -102,8 +105,8 @@ def main():
     
     print("[WRB] Starting up...", flush=True)
     
-    # Breathing LED during startup
-    breathing_led(led, duration=1.5, steps=15)
+    # Quick breathing LED during startup (faster)
+    breathing_led(led, duration=0.8, steps=8)
     
     print("[WRB] Initializing audio...", flush=True)
     init_audio()
