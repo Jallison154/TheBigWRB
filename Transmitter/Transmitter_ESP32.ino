@@ -17,7 +17,7 @@ const bool BTN_ACTIVE_LOW = true;  // true = button to GND with INPUT_PULLUP
 uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // <-- your RX MAC (this should be the receiver's MAC)
 
 // ---------- Messages ----------
-enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0 };
+enum : uint8_t { MSG_PING=0xA0, MSG_ACK=0xA1, MSG_BTN=0xB0, MSG_BTN_HOLD=0xB1 };
 
 // ---------- Link / timing ----------
 uint32_t lastAckMs = 0;
@@ -30,9 +30,9 @@ const uint32_t IDLE_LIGHT_MS    = 5UL  * 60UL * 1000UL;  // 5 minutes
 const uint32_t IDLE_DEEP_MS     = 15UL * 60UL * 1000UL;  // 15 minutes
 uint32_t lastActivityMs         = 0;
 
-// Light-sleep breathing parameters
-const uint32_t BREATH_PERIOD_MS = 2000;   // 2s up/down
-const uint8_t  BREATH_MAX_RAW   = 51;     // ~20% of 255
+// Light-sleep LED parameters
+const uint32_t SLEEP_BLINK_PERIOD_MS = 4000;  // 4s between blinks
+const uint8_t  SLEEP_BLINK_BRIGHTNESS = 26;   // ~10% of 255 (26/255 ≈ 0.1)
 
 // Transmission retry parameters
 const uint8_t  MAX_RETRIES      = 3;
@@ -287,19 +287,19 @@ void loop(){
     return;
   }
 
-  // Between 5 and 15 minutes idle: breathing + light-sleep bursts
+  // Between 5 and 15 minutes idle: simple blink + light-sleep bursts
   if (ENABLE_SLEEP && (now - lastActivityMs) < IDLE_DEEP_MS){
     // If user presses during this phase, send immediately
     if (isBtnActive(BTN1_PIN)) { sendBtn(1); return; }
     if (USE_BTN2 && isBtnActive(BTN2_PIN)) { sendBtn(2); return; }
 
-    // Breathing LED 0..20%
-    uint32_t t = (now - lastActivityMs) % BREATH_PERIOD_MS;
-    uint32_t half = BREATH_PERIOD_MS / 2;
-    uint8_t val = (t < half)
-                  ? (uint8_t)((BREATH_MAX_RAW * t) / half)
-                  : (uint8_t)((BREATH_MAX_RAW * (BREATH_PERIOD_MS - t)) / half);
-    ledWriteRaw(val);
+    // Simple blink every 4 seconds at 10% brightness
+    uint32_t t = (now - lastActivityMs) % SLEEP_BLINK_PERIOD_MS;
+    if (t < 100) {  // 100ms blink
+      ledWriteRaw(SLEEP_BLINK_BRIGHTNESS);
+    } else {
+      ledWriteRaw(0);  // Off for rest of period
+    }
 
     // Short light-sleep "tick" for power saving
     esp_sleep_wakeup_cause_t cause = lightSleepTick(50000ULL); // 50 ms
