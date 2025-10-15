@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os, glob, time, random, sys, serial
-from gpiozero import LED
+from gpiozero import LED, PWMLED
 
 # Import configuration
 try:
@@ -81,20 +81,49 @@ def wait_serial():
             except: pass
         time.sleep(0.3)
 
+def breathing_led(led, duration=2.0, steps=20):
+    """Breathing LED effect from 0 to 100% brightness"""
+    import math
+    for i in range(int(steps * 2)):  # 2 cycles
+        # Create smooth breathing curve using sine wave
+        brightness = (math.sin(i * math.pi / steps) + 1) / 2  # 0 to 1
+        if READY_ACTIVE_LOW:
+            # For active low LEDs, invert the brightness
+            brightness = 1 - brightness
+        led.value = brightness
+        time.sleep(duration / (steps * 2))
+
 def main():
     import pygame
-    led=LED(READY_PIN, active_high=(not READY_ACTIVE_LOW))
-    led.off()  # OFF until ready
-
+    from gpiozero import PWMLED
+    
+    # Use PWMLED for brightness control instead of regular LED
+    led = PWMLED(READY_PIN, active_high=(not READY_ACTIVE_LOW))
+    
+    print("[WRB] Starting up...", flush=True)
+    
+    # Breathing LED during startup
+    breathing_led(led, duration=1.5, steps=15)
+    
+    print("[WRB] Initializing audio...", flush=True)
     init_audio()
+    
+    print("[WRB] Loading sound files...", flush=True)
     src_tag, base, B1, B2, H1, H2 = pick_source()
     BUTTON1, BUTTON2, HOLD1, HOLD2 = load_sounds(B1, B2, H1, H2)
     print(f"[WRB] source={src_tag} button1={B1[:1]} button2={len(BUTTON2)} hold1={H1[:1]} hold2={len(HOLD2)}", flush=True)
 
+    print("[WRB] Connecting to ESP32...", flush=True)
     ser=wait_serial()
     print(f"[WRB] serial: {ser.port}", flush=True)
 
-    led.on(); print("[WRB] READY", flush=True)
+    # Set LED to 25% brightness when ready
+    if READY_ACTIVE_LOW:
+        led.value = 0.75  # 25% brightness for active low
+    else:
+        led.value = 0.25  # 25% brightness for active high
+    
+    print("[WRB] READY - LED at 25% brightness", flush=True)
     last_scan=time.time()
 
     while True:
@@ -115,22 +144,42 @@ def main():
         if t=='B1':
             if BUTTON1: pygame.mixer.Channel(0).play(BUTTON1)
             print("[WRB] BUTTON1 (src=%s loaded=%s)"%(src_tag,bool(BUTTON1)), flush=True)
-            try: led.off(); time.sleep(0.04); led.on()
+            try: 
+                # Blink to 100% brightness
+                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
+                time.sleep(0.1)
+                # Return to 25% brightness
+                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
         elif t=='B2':
             if BUTTON2: pygame.mixer.Channel(1).play(random.choice(BUTTON2))
             print("[WRB] BUTTON2 (src=%s loaded=%d)"%(src_tag,len(BUTTON2)), flush=True)
-            try: led.off(); time.sleep(0.04); led.on()
+            try: 
+                # Blink to 100% brightness
+                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
+                time.sleep(0.1)
+                # Return to 25% brightness
+                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
         elif t=='H1':
             if HOLD1: pygame.mixer.Channel(2).play(HOLD1)
             print("[WRB] HOLD1 (src=%s loaded=%s)"%(src_tag,bool(HOLD1)), flush=True)
-            try: led.off(); time.sleep(0.04); led.on()
+            try: 
+                # Blink to 100% brightness
+                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
+                time.sleep(0.1)
+                # Return to 25% brightness
+                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
         elif t=='H2':
             if HOLD2: pygame.mixer.Channel(3).play(random.choice(HOLD2))
             print("[WRB] HOLD2 (src=%s loaded=%d)"%(src_tag,len(HOLD2)), flush=True)
-            try: led.off(); time.sleep(0.04); led.on()
+            try: 
+                # Blink to 100% brightness
+                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
+                time.sleep(0.1)
+                # Return to 25% brightness
+                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
             except: pass
 
 if __name__=="__main__":

@@ -73,6 +73,11 @@ GPIO 24 ←→ USB LED (220Ω) ←→ 3.3V
 USB     ←→ ESP32 Receiver
 ```
 
+**Ready LED Behavior (GPIO 23):**
+- **Breathing (0-100%)**: System starting up or not ready
+- **25% Brightness**: Service running and ready
+- **100% Blink**: Button command received (returns to 25%)
+
 ## 💻 Software Installation
 
 ### Step 1: Raspberry Pi Setup
