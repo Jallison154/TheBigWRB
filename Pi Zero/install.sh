@@ -67,12 +67,23 @@ cd ~
 
 # Step 4: Copy all files
 echo "📋 Copying application files..."
-cp PiScript ~/WRB/
-cp config.py ~/WRB/
-cp monitor_system.py ~/WRB/
-cp test_esp32_connection.py ~/WRB/
-cp test_system_integration.py ~/WRB/
-cp requirements.txt ~/WRB/
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Copy files from the Pi Zero directory
+cp "$SCRIPT_DIR/PiScript" ~/WRB/ 2>/dev/null || echo "⚠️  PiScript not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/config.py" ~/WRB/ 2>/dev/null || echo "⚠️  config.py not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/monitor_system.py" ~/WRB/ 2>/dev/null || echo "⚠️  monitor_system.py not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/test_esp32_connection.py" ~/WRB/ 2>/dev/null || echo "⚠️  test_esp32_connection.py not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/test_system_integration.py" ~/WRB/ 2>/dev/null || echo "⚠️  test_system_integration.py not found in $SCRIPT_DIR"
+cp "$SCRIPT_DIR/requirements.txt" ~/WRB/ 2>/dev/null || echo "⚠️  requirements.txt not found in $SCRIPT_DIR"
+
+# Copy default sound files if they exist
+if [ -d "$SCRIPT_DIR/default_sounds" ]; then
+    echo "🎵 Copying default sound files..."
+    cp "$SCRIPT_DIR/default_sounds"/*.wav ~/WRB/sounds/ 2>/dev/null || echo "⚠️  Could not copy default sounds"
+fi
 
 # Step 5: Set permissions
 echo "🔐 Setting file permissions..."
@@ -125,16 +136,11 @@ ctl.!default {
 }
 ALSA_EOF
 
-# Step 8: Install default sound files
-echo "🎵 Installing default sound files..."
-# Copy default sound files if they exist
-if [ -d "default_sounds" ]; then
-    echo "📁 Found default sound files, copying..."
-    cp default_sounds/*.wav ~/WRB/sounds/ 2>/dev/null || echo "⚠️  Could not copy default sounds"
-    echo "✅ Default sound files installed"
-else
-    echo "📁 No default sounds found, creating sample files..."
-    # Fallback to creating sample sounds if default files not available
+# Step 8: Create sample sound files if none exist
+echo "🎵 Checking for sound files..."
+if [ ! -f ~/WRB/sounds/button1.wav ] || [ ! -f ~/WRB/sounds/button2.wav ] || [ ! -f ~/WRB/sounds/hold1.wav ] || [ ! -f ~/WRB/sounds/hold2.wav ]; then
+    echo "📁 Creating sample sound files..."
+    # Create sample sounds if default files not available
     if [ ! -f ~/WRB/sounds/button1.wav ]; then
         sox -n -r 44100 -c 2 ~/WRB/sounds/button1.wav synth 0.5 sine 800 fade h 0.1 0.1 2>/dev/null || echo "⚠️  sox not available, skipping sample sound creation"
     fi
@@ -147,6 +153,9 @@ else
     if [ ! -f ~/WRB/sounds/hold2.wav ]; then
         sox -n -r 44100 -c 2 ~/WRB/sounds/hold2.wav synth 1.0 sine 600 fade h 0.1 0.1 2>/dev/null || echo "⚠️  sox not available, skipping sample sound creation"
     fi
+    echo "✅ Sample sound files created"
+else
+    echo "✅ Sound files already exist"
 fi
 
 # Step 9: Install systemd service
