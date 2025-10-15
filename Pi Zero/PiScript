@@ -88,10 +88,10 @@ def play_random_sound(sound_paths, channel=1):
 
 def classify(s):
     u=s.strip().upper()
-    if "BTN1" in u and "HOLD" not in u: return 'B1'
-    if "BTN2" in u and "HOLD" not in u: return 'B2'
     if "BTN1" in u and "HOLD" in u: return 'H1'
     if "BTN2" in u and "HOLD" in u: return 'H2'
+    if "BTN1" in u: return 'B1'
+    if "BTN2" in u: return 'B2'
     return None
 
 def ensure_mixer():

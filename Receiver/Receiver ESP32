@@ -176,12 +176,9 @@ void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len){
                      btnId, info->src_addr[0], info->src_addr[1], info->src_addr[2],
                      info->src_addr[3], info->src_addr[4], info->src_addr[5]);
         
-        // Update button states for this transmitter
-        if (btnId == 1) {
-          txLinks[txIndex].lastBtn1State = 1;
-        } else if (btnId == 2) {
-          txLinks[txIndex].lastBtn2State = 1;
-        }
+        // Send to Pi via serial
+        Serial.printf("BTN%u\n", btnId);
+        
         lastBtnActivityMs = now;
         
         // Send ACK back
@@ -195,6 +192,9 @@ void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len){
         Serial.printf("RX: BTN%u HOLD from %02X:%02X:%02X:%02X:%02X:%02X\n", 
                      btnId, info->src_addr[0], info->src_addr[1], info->src_addr[2],
                      info->src_addr[3], info->src_addr[4], info->src_addr[5]);
+        
+        // Send to Pi via serial
+        Serial.printf("BTN%u HOLD\n", btnId);
         
         lastHoldActivityMs = now;  // Set hold activity timestamp for double blink
         

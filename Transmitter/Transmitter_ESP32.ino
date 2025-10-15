@@ -41,25 +41,53 @@ const uint16_t RETRY_DELAY_MS   = 50;
 // Wake cause (for logging only; we do NOT send on deep wake anymore)
 esp_sleep_wakeup_cause_t wakeCause = ESP_SLEEP_WAKEUP_UNDEFINED;
 
-// ---------- Button debouncer ----------
-struct BtnDeb {
+// ---------- Button state tracking ----------
+struct BtnState {
   uint8_t pin;
   bool activeLow;
   int lastLevel;
   uint32_t lastFlip;
+  bool pressed;
+  uint32_t pressStartMs;
   bool armed;
 };
 const uint16_t DEBOUNCE_MS = 40;
-BtnDeb b1{BTN1_PIN, BTN_ACTIVE_LOW, HIGH, 0, true};
-BtnDeb b2{BTN2_PIN, BTN_ACTIVE_LOW, HIGH, 0, true};
+const uint16_t HOLD_THRESHOLD_MS = 800; // Hold if pressed for more than 800ms
+BtnState b1{BTN1_PIN, BTN_ACTIVE_LOW, HIGH, 0, false, 0, true};
+BtnState b2{BTN2_PIN, BTN_ACTIVE_LOW, HIGH, 0, false, 0, true};
 
-bool pressEvent(BtnDeb& b){
+bool updateButtonState(BtnState& b){
   int lvl = digitalRead(b.pin);
   uint32_t now = millis();
-  if (lvl != b.lastLevel){ b.lastLevel = lvl; b.lastFlip = now; }
   bool active = b.activeLow ? (lvl==LOW) : (lvl==HIGH);
-  if (!active){ b.armed = true; return false; }
-  if (b.armed && (now - b.lastFlip) > DEBOUNCE_MS){ b.armed = false; return true; }
+  
+  // Detect state changes
+  if (lvl != b.lastLevel) {
+    b.lastLevel = lvl;
+    b.lastFlip = now;
+    return false; // Wait for debounce
+  }
+  
+  // Debounce check
+  if ((now - b.lastFlip) < DEBOUNCE_MS) {
+    return false;
+  }
+  
+  // Handle press start
+  if (active && !b.pressed && b.armed) {
+    b.pressed = true;
+    b.pressStartMs = now;
+    b.armed = false;
+    return false; // Don't trigger yet - wait for release
+  }
+  
+  // Handle release
+  if (!active && b.pressed) {
+    b.pressed = false;
+    b.armed = true;
+    return true; // Button was released - caller should check duration
+  }
+  
   return false;
 }
 
@@ -127,23 +155,30 @@ void sendPing(){
   }
 }
 
-void sendBtn(uint8_t id){
-  uint8_t m[2] = { MSG_BTN, id };
+void sendBtn(uint8_t id, bool isHold = false){
+  uint8_t msgType = isHold ? MSG_BTN_HOLD : MSG_BTN;
+  uint8_t m[2] = { msgType, id };
   
   // Retry mechanism for better reliability
   for (uint8_t retry = 0; retry < MAX_RETRIES; retry++) {
     esp_err_t result = esp_now_send(RX_MAC, m, sizeof(m));
     if (result == ESP_OK) {
-      Serial.printf("TX: BTN%u pressed (local) - sent successfully\n", id);
+      if (isHold) {
+        Serial.printf("TX: BTN%u HOLD (local) - sent successfully\n", id);
+      } else {
+        Serial.printf("TX: BTN%u pressed (local) - sent successfully\n", id);
+      }
       lastActivityMs = millis(); // reset idle timer on local activity
       return;
     }
-    Serial.printf("TX: BTN%u send attempt %d failed (error: %d)\n", id, retry + 1, result);
+    Serial.printf("TX: BTN%u %s send attempt %d failed (error: %d)\n", 
+                  id, isHold ? "HOLD" : "press", retry + 1, result);
     if (retry < MAX_RETRIES - 1) {
       delay(RETRY_DELAY_MS);
     }
   }
-  Serial.printf("TX: BTN%u failed to send after %d retries\n", id, MAX_RETRIES);
+  Serial.printf("TX: BTN%u %s failed to send after %d retries\n", 
+                id, isHold ? "HOLD" : "press", MAX_RETRIES);
 }
 
 // ---------- Sleep helpers ----------
@@ -234,8 +269,15 @@ void loop(){
 
   // If we're before 5 min idle: normal active mode
   if (ENABLE_SLEEP && (now - lastActivityMs) < IDLE_LIGHT_MS){
-    if (pressEvent(b1)) sendBtn(1);
-    if (USE_BTN2 && pressEvent(b2)) sendBtn(2);
+    // Check for button releases and determine if press or hold
+    if (updateButtonState(b1)) {
+      uint32_t holdDuration = now - b1.pressStartMs;
+      sendBtn(1, holdDuration >= HOLD_THRESHOLD_MS);
+    }
+    if (USE_BTN2 && updateButtonState(b2)) {
+      uint32_t holdDuration = now - b2.pressStartMs;
+      sendBtn(2, holdDuration >= HOLD_THRESHOLD_MS);
+    }
 
     static uint32_t lastPing = 0;
     if (now - lastPing >= 500){ lastPing = now; sendPing(); }
