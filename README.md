@@ -1,6 +1,6 @@
-# ESP32 Wireless Button System
+# ESP32 Wireless Button System (TheBigWRB)
 
-A battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** devices with ESP-NOW protocol. The system consists of transmitters (with buttons) and a receiver that processes button presses, with enhanced hold functionality and Raspberry Pi integration for audio feedback.
+A complete battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** devices with ESP-NOW protocol. Features release-based triggering, hold detection, audio feedback, and one-command Raspberry Pi installation.
 
 ## System Overview
 
@@ -12,13 +12,23 @@ A battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** d
 - **Hold Functionality**: Buttons can be held for extended actions without triggering normal press sounds
 - **Audio Integration**: Raspberry Pi script for playing different sounds based on button actions
 
-## Files
+## Project Structure
 
-- `Transmitter_ESP32.ino` - Transmitter code (for button devices)
-- `Receiver ESP32` - Receiver code (for central device)
-- `Transmitter ESP32.c` - Enhanced transmitter with hold detection
-- `MAC_Finder.ino` - Utility to find device MAC addresses
-- `Pi Zero/Pi Script` - Enhanced Raspberry Pi script for audio playback
+```
+TheBigWRB/
+├── Transmitter/
+│   └── Transmitter_ESP32.ino    # Main transmitter code with release-based triggering
+├── Receiver/
+│   └── Receiver ESP32           # Receiver code with hold detection
+├── Pi Zero/
+│   ├── PiScript                 # Main Raspberry Pi audio script
+│   ├── config.py                # Configuration file
+│   ├── install.sh               # One-command installation script
+│   ├── default_sounds/          # Default audio files included
+│   └── WRB-enhanced.service     # Systemd service configuration
+├── MAC_Finder.ino               # Utility to find device MAC addresses
+└── README.md                    # This file
+```
 
 ## Key Improvements Made
 
@@ -52,17 +62,19 @@ A battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** d
 - **Receiver**: Only accepts messages from pre-configured transmitter MACs
 - **Unauthorized Device Rejection**: Logs and ignores messages from unknown devices
 
-### 7. **Button Hold Functionality** ⭐ **NEW**
-- **Hold Detection**: Buttons can be held for 1 second to trigger hold actions
-- **Dual Sound System**: Different sounds for quick press vs. hold actions
-- **Smart Release**: Hold actions prevent normal press sounds when released
-- **Configurable Timing**: Hold delay is configurable (currently set to 1000ms)
+### 7. **Release-Based Triggering** ⭐ **NEW**
+- **No Double Triggers**: Only triggers on button release, not press
+- **Hold Detection**: Measures hold duration to distinguish press vs hold (800ms threshold)
+- **Instant Response**: Audio plays immediately on release without initialization delays
+- **Smart Classification**: Automatically determines if it was a press or hold based on duration
 
 ### 8. **Enhanced Audio System** ⭐ **NEW**
+- **Keep-Open Audio**: Mixer initialized once at startup, no audio cutoffs
 - **4-Channel Audio**: Supports simultaneous playback of multiple sounds
 - **Smart File Naming**: Clear naming convention for different button actions
 - **USB Hot-Swapping**: Automatic detection and use of sound files from USB drives
 - **Local Fallback**: Falls back to local storage if no USB drive is available
+- **Default Sounds**: Sample audio files included for immediate testing
 
 ## Hardware Setup
 
@@ -134,8 +146,9 @@ uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // Your receiver MAC
 - Breathing LED during light sleep phase
 
 ### Hold Configuration ⭐ **NEW**
-- Hold delay: 1000ms (1 second) - configurable in Pi script
-- Hold functionality can be enabled/disabled via configuration
+- Hold delay: 800ms (0.8 seconds) - configurable in transmitter code
+- Release-based triggering prevents double events
+- Automatic classification of press vs hold actions
 
 ## Usage
 
@@ -176,9 +189,10 @@ uint8_t RX_MAC[] = { 0x58,0x8C,0x81,0x9E,0x30,0x10 }; // Your receiver MAC
      - Double blink: No transmitters connected
 
 ### Button Actions ⭐ **NEW**
-- **Quick Press and Release** (< 1 second): Triggers normal button action
-- **Hold Button** (≥ 1 second): Triggers hold action, prevents normal action on release
-- **Release After Hold**: No additional sound plays
+- **Quick Press and Release** (< 800ms): Triggers normal button action (BTN1/BTN2)
+- **Hold Button** (≥ 800ms): Triggers hold action (BTN1 HOLD/BTN2 HOLD), prevents normal action on release
+- **Release-Based**: Only triggers on button release, never on press
+- **No Double Triggers**: Each button press/release cycle triggers exactly one action
 
 ### Serial Output
 Both devices provide detailed serial output for debugging:
@@ -310,17 +324,12 @@ This project is now **publicly available** on GitHub!
 
 ### One-Command Installation
 
-**Option 1: Direct Install (Recommended)**
+**Direct Install (Recommended)**
 ```bash
 curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero/install.sh | bash
 ```
 
-**Option 2: Quick Install**
-```bash
-curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero/quick_install.sh | bash
-```
-
-**Option 3: Clone and Install**
+**Clone and Install**
 ```bash
 git clone https://github.com/Jallison154/TheBigWRB.git && cd TheBigWRB/Pi\ Zero && chmod +x install.sh && ./install.sh
 ```
@@ -330,8 +339,20 @@ git clone https://github.com/Jallison154/TheBigWRB.git && cd TheBigWRB/Pi\ Zero 
 - ✅ Default sound files included
 - ✅ Automatic error handling
 - ✅ Complete system setup
+- ✅ Anti-reboot loop protection
+- ✅ Auto-start on boot
 
 For detailed installation instructions, see the [Complete Installation Guide](Pi%20Zero/INSTALLATION_GUIDE.md).
+
+## Current Status
+
+✅ **Production Ready**: All core functionality implemented and tested
+✅ **Clean Codebase**: Removed all temporary files and debugging scripts  
+✅ **One-Command Install**: Complete system setup with single command
+✅ **Release-Based Triggering**: No more double triggers, proper hold detection
+✅ **Audio Cutoff Fixed**: Keep-open audio system prevents audio cutoffs
+✅ **Auto-Start**: System automatically starts on boot with reliability features
+✅ **Default Sounds**: Sample audio files included for immediate testing
 
 ## License
 
