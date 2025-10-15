@@ -92,19 +92,25 @@ fi
 echo "🔊 Setting up audio..."
 sudo usermod -a -G audio $USER
 
-# Create ALSA configuration
-# Remove any existing .asoundrc file or directory to prevent conflicts
+# Create PulseAudio configuration for better compatibility
+mkdir -p ~/.config/pulse
+cat > ~/.config/pulse/client.conf << 'PULSE_EOF'
+default-server = unix:/run/user/1000/pulse/native
+autospawn = no
+daemon-binary = /bin/true
+enable-shm = false
+PULSE_EOF
+
+# Create ALSA configuration as fallback
 rm -rf ~/.asoundrc
-cat > ~/.asoundrc << 'EOF'
+cat > ~/.asoundrc << 'ALSA_EOF'
 pcm.!default {
-    type hw
-    card 0
+    type pulse
 }
 ctl.!default {
-    type hw
-    card 0
+    type pulse
 }
-EOF
+ALSA_EOF
 
 # Step 8: Install default sound files
 echo "🎵 Installing default sound files..."
@@ -136,7 +142,7 @@ echo "⚙️ Installing systemd service..."
 ACTUAL_USER=$(whoami)
 echo "🔧 Using username: $ACTUAL_USER"
 
-sudo tee /etc/systemd/system/WRB-enhanced.service >/dev/null << EOF
+sudo tee /etc/systemd/system/WRB-enhanced.service >/dev/null << 'SERVICE_EOF'
 [Unit]
 Description=WRB Enhanced Audio System
 After=network.target
@@ -151,10 +157,8 @@ Environment=HOME=/home/$ACTUAL_USER
 Environment=USER=$ACTUAL_USER
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=WRB_SERIAL=/dev/ttyACM0
-Environment=SDL_AUDIODRIVER=alsa
-Environment=AUDIODEV=plughw:0,0
-Environment=ALSA_CARD=0
-Environment=ALSA_DEVICE=0
+Environment=SDL_AUDIODRIVER=pulse
+Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
 ExecStart=/usr/bin/python3 /home/$ACTUAL_USER/WRB/PiScript
 Restart=always
 RestartSec=5
@@ -163,7 +167,7 @@ StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-EOF
+SERVICE_EOF
 
 # Step 10: Enable and start service
 echo "🚀 Starting service..."

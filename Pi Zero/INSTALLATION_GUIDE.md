@@ -68,8 +68,8 @@ USB         ←→ Raspberry Pi
 
 ### Raspberry Pi
 ```
-GPIO 18 ←→ Ready LED (220Ω) ←→ 3.3V
-GPIO 23 ←→ USB LED (220Ω) ←→ 3.3V
+GPIO 23 ←→ Ready LED (220Ω) ←→ 3.3V
+GPIO 24 ←→ USB LED (220Ω) ←→ 3.3V
 USB     ←→ ESP32 Receiver
 ```
 
