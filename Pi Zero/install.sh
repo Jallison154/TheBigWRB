@@ -264,13 +264,31 @@ sudo systemctl reset-failed WRB-enhanced.service 2>/dev/null || true
 # Reload systemd configuration
 sudo systemctl daemon-reload
 
+# Verify service file was created correctly
+echo "🔍 Verifying service file..."
+if [ -f "/etc/systemd/system/WRB-enhanced.service" ]; then
+    echo "✅ Service file exists"
+    echo "📄 Service file contents:"
+    cat /etc/systemd/system/WRB-enhanced.service
+else
+    echo "❌ Service file missing!"
+fi
+
 # Enable services
 sudo systemctl enable WRB-enhanced.service
 echo "✅ WRB-enhanced.service enabled for auto-start"
 
-# Start services
-sudo systemctl start WRB-enhanced.service
-echo "✅ WRB-enhanced.service started"
+# Start services with detailed error reporting
+echo "🚀 Starting WRB-enhanced.service..."
+if sudo systemctl start WRB-enhanced.service; then
+    echo "✅ WRB-enhanced.service started successfully"
+else
+    echo "❌ Failed to start WRB-enhanced.service"
+    echo "📋 Service status:"
+    sudo systemctl status WRB-enhanced.service --no-pager
+    echo "📋 Recent logs:"
+    sudo journalctl -u WRB-enhanced.service --no-pager -n 20
+fi
 
 # Additional reliability: Create a startup script that ensures service starts
 echo "🔧 Creating auto-start reliability script..."
@@ -388,6 +406,18 @@ echo "   Current user: $ACTUAL_USER"
 echo "   User groups: $(groups $ACTUAL_USER)"
 echo "   Audio group: $(groups $ACTUAL_USER | grep -o audio || echo 'Not in audio group')"
 
+# Test PiScript manually to see if it can run
+echo ""
+echo "🧪 Testing PiScript manually..."
+echo "   Running: python3 ~/WRB/PiScript --help 2>&1 | head -10"
+timeout 5 python3 ~/WRB/PiScript 2>&1 | head -10 || echo "   PiScript test completed (timeout or error expected)"
+
+echo ""
+echo "🔍 Checking Python dependencies..."
+python3 -c "import pygame; print('✅ pygame available')" 2>/dev/null || echo "❌ pygame not available"
+python3 -c "import serial; print('✅ serial available')" 2>/dev/null || echo "❌ serial not available"
+python3 -c "from gpiozero import LED; print('✅ gpiozero available')" 2>/dev/null || echo "❌ gpiozero not available"
+
 echo ""
 echo "🔍 Auto-Start Services Status:"
 sudo systemctl status WRB-auto-start.service --no-pager
@@ -425,6 +455,14 @@ echo "🔄 REBOOT TEST:"
 echo "  The system will automatically start after reboot:"
 echo "  sudo reboot"
 echo "  # After reboot, check: sudo systemctl status WRB-enhanced.service"
+echo ""
+echo "🔧 MANUAL TROUBLESHOOTING:"
+echo "  If service still won't start, try these commands:"
+echo "  1. Manual start test:     chmod +x manual_start.sh && ./manual_start.sh"
+echo "  2. Check service logs:    sudo journalctl -u WRB-enhanced.service -f"
+echo "  3. Restart service:       sudo systemctl restart WRB-enhanced.service"
+echo "  4. Check service status:  sudo systemctl status WRB-enhanced.service"
+echo "  5. Reset and restart:     sudo systemctl reset-failed WRB-enhanced.service && sudo systemctl start WRB-enhanced.service"
 echo ""
 echo "🛡️  MAXIMUM RELIABILITY ACHIEVED!"
 echo "  - Service auto-starts on boot"
