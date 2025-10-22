@@ -17,6 +17,31 @@ fi
 # Apply USB audio optimizations
 echo "🔊 Optimizing USB audio configuration..."
 
+# Disable PulseAudio suspend-on-idle module (prevents audio cutoff with USB audio)
+echo "🔧 Disabling PulseAudio suspend-on-idle module..."
+if [ -f /etc/pulse/default.pa ]; then
+    sudo sed -i 's/^load-module module-suspend-on-idle/#load-module module-suspend-on-idle/' /etc/pulse/default.pa
+    echo "✅ Disabled suspend-on-idle in system PulseAudio config"
+else
+    echo "⚠️  System PulseAudio config not found, using user config"
+fi
+
+# Create user-level PulseAudio config if needed
+mkdir -p ~/.config/pulse
+if [ ! -f ~/.config/pulse/default.pa ]; then
+    cat > ~/.config/pulse/default.pa << 'PULSE_USER_EOF'
+# Custom PulseAudio configuration for USB audio
+# Disable suspend-on-idle to prevent audio cutoff
+# load-module module-suspend-on-idle
+load-module module-device-manager
+load-module module-stream-restore
+load-module module-card-restore
+load-module module-augment-properties
+load-module module-switch-on-port-available
+PULSE_USER_EOF
+    echo "✅ Created user PulseAudio config with suspend-on-idle disabled"
+fi
+
 # Restart PulseAudio with optimized settings
 echo "📡 Restarting PulseAudio with USB audio optimizations..."
 pulseaudio --kill

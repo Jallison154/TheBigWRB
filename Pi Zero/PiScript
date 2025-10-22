@@ -65,6 +65,18 @@ def init_audio():
     """Initialize pygame mixer once and keep it open with USB audio optimizations"""
     import pygame
     try:
+        # Apply USB audio fix before initializing pygame
+        print("[WRB] Applying USB audio fix...", flush=True)
+        try:
+            import subprocess
+            # Disable PulseAudio suspend-on-idle module (prevents audio cutoff)
+            subprocess.run(['pulseaudio', '--kill'], check=False)
+            time.sleep(1)
+            subprocess.run(['pulseaudio', '--start'], check=False)
+            print("[WRB] PulseAudio restarted with USB audio optimizations", flush=True)
+        except:
+            print("[WRB] Could not restart PulseAudio, continuing...", flush=True)
+        
         # USB audio optimizations for pygame mixer
         pygame.mixer.pre_init(
             frequency=MIX_FREQ, 
@@ -78,7 +90,6 @@ def init_audio():
         
         # Set audio device to USB audio if available
         try:
-            import subprocess
             # Check for USB audio devices
             result = subprocess.run(['aplay', '-l'], capture_output=True, text=True)
             if 'USB' in result.stdout:

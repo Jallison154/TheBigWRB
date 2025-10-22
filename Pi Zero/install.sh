@@ -153,63 +153,34 @@ fi
 echo "🔊 Setting up audio..."
 sudo usermod -a -G audio $USER
 
-# Apply USB audio optimizations to prevent sound cutoff at beginning
-echo "🔧 Applying USB audio optimizations..."
-# Set USB audio buffer size to prevent cutoff
-echo "🔊 Configuring USB audio for optimal performance..."
+# Apply USB audio fix to prevent sound cutoff at beginning
+echo "🔧 Applying USB audio fix..."
+echo "   This fixes the issue where audio is cut off at the beginning of playback"
+echo "   Optimized for USB audio cards (not HDMI)"
 
-# Create ALSA configuration for USB audio optimization
-sudo tee /etc/asound.conf >/dev/null << 'ALSA_USB_EOF'
-# USB Audio Configuration for WRB System
-# Optimized to prevent audio cutoff at beginning of playback
+# Disable PulseAudio suspend-on-idle module (prevents audio cutoff with USB audio)
+echo "🔧 Disabling PulseAudio suspend-on-idle module..."
+if [ -f /etc/pulse/default.pa ]; then
+    sudo sed -i 's/^load-module module-suspend-on-idle/#load-module module-suspend-on-idle/' /etc/pulse/default.pa
+    echo "✅ Disabled suspend-on-idle in system PulseAudio config"
+else
+    echo "⚠️  System PulseAudio config not found, creating user config"
+fi
 
-pcm.!default {
-    type pulse
-    hint {
-        show on
-        description "Default ALSA Output (currently PulseAudio)"
-    }
-}
-
-ctl.!default {
-    type pulse
-}
-
-# USB Audio specific configuration
-pcm.usb_audio {
-    type hw
-    card 0
-    device 0
-}
-
-# PulseAudio configuration for USB audio
-pcm.pulse {
-    type pulse
-}
-
-ctl.pulse {
-    type pulse
-}
-ALSA_USB_EOF
-
-# Create PulseAudio daemon configuration for USB audio optimization
+# Create user-level PulseAudio config to disable suspend-on-idle
 mkdir -p ~/.config/pulse
-cat > ~/.config/pulse/daemon.conf << 'PULSE_USB_EOF'
-# PulseAudio daemon configuration optimized for USB audio
-default-sample-rate = 44100
-default-sample-format = s16le
-default-sample-channels = 2
-default-fragments = 4
-default-fragment-size-msec = 25
-high-priority = yes
-nice-level = -11
-realtime-scheduling = yes
-realtime-priority = 9
-rlimit-rtprio = 9
-daemonize = no
+cat > ~/.config/pulse/default.pa << 'PULSE_USB_EOF'
+# Custom PulseAudio configuration for USB audio
+# Disable suspend-on-idle to prevent audio cutoff
+# load-module module-suspend-on-idle
+load-module module-device-manager
+load-module module-stream-restore
+load-module module-card-restore
+load-module module-augment-properties
+load-module module-switch-on-port-available
 PULSE_USB_EOF
 
-echo "✅ USB audio optimizations applied"
+echo "✅ USB audio fix applied (PulseAudio suspend-on-idle disabled)"
 
 # Create PulseAudio configuration for better compatibility
 mkdir -p ~/.config/pulse
@@ -279,8 +250,7 @@ Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=WRB_SERIAL=/dev/ttyACM0
 Environment=SDL_AUDIODRIVER=pulse
 Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
-# Apply USB audio optimizations before starting the service
-ExecStartPre=/bin/bash -c 'pulseaudio --kill && sleep 1 && pulseaudio --start'
+# USB audio fix is applied in PiScript init_audio() function
 ExecStart=/usr/bin/python3 /home/wrb01/WRB/PiScript
 Restart=on-failure
 RestartSec=10
