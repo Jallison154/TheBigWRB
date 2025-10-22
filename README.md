@@ -1,4 +1,4 @@
-# ESP32 Wireless Button System (TheBigWRB)
+# ESP32 Wireless Button System (WRB)
 
 A complete battery-efficient wireless button system using **Seeed Studio XIAO ESP32C3** devices with ESP-NOW protocol. Features release-based triggering, hold detection, audio feedback, and one-command Raspberry Pi installation.
 
