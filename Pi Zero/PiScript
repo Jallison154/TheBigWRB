@@ -10,12 +10,15 @@ import time
 import serial
 import pygame
 import glob
+import subprocess
 from datetime import datetime
+from gpiozero import LED, PWMLED
 
 # Configuration
 BAUD = 115200
 SERIAL_PORT = "/dev/ttyACM0"
 READY_PIN = 23
+USB_LED_PIN = 24
 MIX_FREQ = 44100
 MIX_BUF = 512
 
@@ -35,15 +38,73 @@ print(f"[WRB] Audio initialized: {MIX_FREQ}Hz, buffer={MIX_BUF}")
 SOUNDS_DIR = os.path.expanduser("~/WRB/sounds")
 os.makedirs(SOUNDS_DIR, exist_ok=True)
 
+# Global variables for debouncing
+last_button_time = {}
+button_debounce_time = 0.5  # 500ms debounce
+
+# Initialize LEDs
+try:
+    ready_led = LED(READY_PIN)
+    usb_led = LED(USB_LED_PIN)
+    print(f"[WRB] LEDs initialized on pins {READY_PIN} and {USB_LED_PIN}")
+except Exception as e:
+    print(f"[WRB] LED initialization failed: {e}")
+    ready_led = None
+    usb_led = None
+
+def usb_mount_dirs():
+    """Get list of mounted USB directories"""
+    base = "/media"
+    if not os.path.exists(base):
+        return []
+    
+    try:
+        return [os.path.join(base, d) for d in sorted(os.listdir(base)) 
+                if os.path.isdir(os.path.join(base, d)) and os.path.ismount(os.path.join(base, d))]
+    except Exception:
+        return []
+
+def check_usb_sounds():
+    """Check for sound files on USB drives"""
+    usb_dirs = usb_mount_dirs()
+    for usb_dir in usb_dirs:
+        sound_files = []
+        for pattern in ["button1*.wav", "button2*.wav", "hold1*.wav", "hold2*.wav"]:
+            sound_files.extend(glob.glob(os.path.join(usb_dir, pattern)))
+        if sound_files:
+            return usb_dir, sound_files
+    return None, []
+
+def update_usb_led():
+    """Update USB LED based on USB drive status"""
+    if usb_led is None:
+        return
+    
+    usb_dir, sound_files = check_usb_sounds()
+    if usb_dir and sound_files:
+        usb_led.on()
+        print(f"[WRB] USB drive detected: {usb_dir} with {len(sound_files)} sound files")
+    else:
+        usb_led.off()
+
 def load_sounds():
-    """Load sound files into memory"""
+    """Load sound files into memory with USB support"""
     sounds = {}
     
+    # Check USB drives first
+    usb_dir, usb_sounds = check_usb_sounds()
+    if usb_dir and usb_sounds:
+        print(f"[WRB] Loading sounds from USB: {usb_dir}")
+        sound_dir = usb_dir
+    else:
+        print(f"[WRB] Loading sounds from local directory: {SOUNDS_DIR}")
+        sound_dir = SOUNDS_DIR
+    
     # Find sound files
-    button1_files = glob.glob(os.path.join(SOUNDS_DIR, "button1*.wav"))
-    button2_files = glob.glob(os.path.join(SOUNDS_DIR, "button2*.wav"))
-    hold1_files = glob.glob(os.path.join(SOUNDS_DIR, "hold1*.wav"))
-    hold2_files = glob.glob(os.path.join(SOUNDS_DIR, "hold2*.wav"))
+    button1_files = glob.glob(os.path.join(sound_dir, "button1*.wav"))
+    button2_files = glob.glob(os.path.join(sound_dir, "button2*.wav"))
+    hold1_files = glob.glob(os.path.join(sound_dir, "hold1*.wav"))
+    hold2_files = glob.glob(os.path.join(sound_dir, "hold2*.wav"))
     
     # Load sounds
     if button1_files:
@@ -65,36 +126,85 @@ def load_sounds():
     return sounds
 
 def play_sound(sounds, sound_name):
-    """Play a sound if available"""
+    """Play a sound if available with debouncing"""
+    current_time = time.time()
+    
+    # Check debounce
+    if sound_name in last_button_time:
+        if current_time - last_button_time[sound_name] < button_debounce_time:
+            print(f"[WRB] Debouncing {sound_name} (too soon)")
+            return
+    
+    last_button_time[sound_name] = current_time
+    
     if sound_name in sounds:
         try:
             sounds[sound_name].play()
             print(f"[WRB] Playing {sound_name}")
+            
+            # Flash ready LED
+            if ready_led:
+                ready_led.blink(0.1, 0.1, 3)  # Blink 3 times
+            
         except Exception as e:
             print(f"[WRB] Error playing {sound_name}: {e}")
     else:
         print(f"[WRB] Sound {sound_name} not available")
 
 def connect_esp32():
-    """Connect to ESP32 receiver"""
-    try:
-        ser = serial.Serial(SERIAL_PORT, BAUD, timeout=1)
-        print(f"[WRB] Connected to ESP32 on {SERIAL_PORT}")
-        return ser
-    except Exception as e:
-        print(f"[WRB] Failed to connect to ESP32: {e}")
-        return None
+    """Connect to ESP32 receiver with multiple port detection"""
+    ports_to_try = [SERIAL_PORT, "/dev/ttyACM1", "/dev/ttyUSB0", "/dev/ttyUSB1"]
+    
+    for port in ports_to_try:
+        try:
+            if os.path.exists(port):
+                ser = serial.Serial(port, BAUD, timeout=1)
+                print(f"[WRB] Connected to ESP32 on {port}")
+                return ser
+        except Exception as e:
+            print(f"[WRB] Failed to connect on {port}: {e}")
+            continue
+    
+    print("[WRB] No ESP32 found on any serial port")
+    return None
+
+def parse_esp32_message(data):
+    """Parse ESP32 message and return action"""
+    data = data.strip()
+    
+    # Handle different message formats
+    if "BTN1" in data and "HOLD" not in data:
+        return "button1"
+    elif "BTN2" in data and "HOLD" not in data:
+        return "button2"
+    elif "HOLD1" in data or "BTN1_HOLD" in data:
+        return "hold1"
+    elif "HOLD2" in data or "BTN2_HOLD" in data:
+        return "hold2"
+    elif "BTN1" in data:
+        return "button1"
+    elif "BTN2" in data:
+        return "button2"
+    
+    return None
 
 def main():
     """Main application loop"""
     print("[WRB] Starting WRB Pi Script")
     print(f"[WRB] Configuration: BAUD={BAUD}, SERIAL={SERIAL_PORT}, READY_PIN={READY_PIN}")
     
+    # Set ready LED to indicate startup
+    if ready_led:
+        ready_led.on()
+    
     # Load sounds
     sounds = load_sounds()
     if not sounds:
         print("[WRB] No sound files found in ~/WRB/sounds/")
         print("[WRB] Please add button1*.wav, button2*.wav, hold1*.wav, hold2*.wav files")
+    
+    # Update USB LED
+    update_usb_led()
     
     # Connect to ESP32
     ser = connect_esp32()
@@ -112,6 +222,10 @@ def main():
     
     print("[WRB] Ready! Waiting for button presses...")
     
+    # Set ready LED to indicate ready
+    if ready_led:
+        ready_led.off()  # Turn off to show ready
+    
     # Main loop
     try:
         while True:
@@ -122,17 +236,16 @@ def main():
                         print(f"[WRB] Received: {data}")
                         
                         # Parse button messages
-                        if "BTN1" in data:
-                            play_sound(sounds, 'button1')
-                        elif "BTN2" in data:
-                            play_sound(sounds, 'button2')
-                        elif "HOLD1" in data:
-                            play_sound(sounds, 'hold1')
-                        elif "HOLD2" in data:
-                            play_sound(sounds, 'hold2')
+                        action = parse_esp32_message(data)
+                        if action:
+                            play_sound(sounds, action)
                         
                 except Exception as e:
                     print(f"[WRB] Error reading serial: {e}")
+            
+            # Update USB LED periodically
+            if int(time.time()) % 5 == 0:  # Every 5 seconds
+                update_usb_led()
             
             time.sleep(0.1)
             
@@ -140,6 +253,10 @@ def main():
         print("\n[WRB] Exiting...")
         if ser:
             ser.close()
+        if ready_led:
+            ready_led.off()
+        if usb_led:
+            usb_led.off()
         sys.exit(0)
 
 if __name__ == "__main__":
