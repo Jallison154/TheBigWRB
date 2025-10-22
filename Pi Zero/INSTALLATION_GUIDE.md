@@ -1,25 +1,20 @@
-# ESP32 Wireless Button System - Complete Installation Guide
+# ESP32 Wireless Button System - Installation Guide
 
-This guide will help you set up the ESP32 Wireless Button System on a new Raspberry Pi from scratch using the GitHub repository.
+This guide will help you set up the ESP32 Wireless Button System on a Raspberry Pi using the GitHub repository.
 
-## 🚀 One-Command Installation
+## 🚀 Quick Installation
 
-Choose your preferred installation method:
-
-### Option 1: Direct Download and Install (Recommended)
+### One-Command Install (Recommended)
 ```bash
 curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero/install.sh | bash
 ```
 
-### Option 2: Quick Install Script
+### Clone and Install
 ```bash
-curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero/quick_install.sh | bash
-```
-
-### Option 3: Clone and Install
-```bash
-# Download and run in one command
-git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB && cd ~/TheBigWRB/Pi\ Zero && chmod +x install.sh && ./install.sh
+git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
+cd ~/TheBigWRB/Pi\ Zero
+chmod +x install.sh
+./install.sh
 ```
 
 **That's it!** The automated installation script will handle everything else including:
