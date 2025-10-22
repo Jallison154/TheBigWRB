@@ -14,7 +14,7 @@ Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=WRB_SERIAL=/dev/ttyACM0
 Environment=SDL_AUDIODRIVER=pulse
 Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
-# USB audio fix is applied in PiScript init_audio() function
+# Standard audio setup
 ExecStart=/usr/bin/python3 /home/wrb01/WRB/PiScript
 Restart=always
 RestartSec=5

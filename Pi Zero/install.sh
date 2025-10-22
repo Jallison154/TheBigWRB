@@ -76,27 +76,54 @@ echo "🔍 Script directory: $SCRIPT_DIR"
 echo "📁 Files in script directory:"
 ls -la "$SCRIPT_DIR" | grep -E "\.(py|txt)$|PiScript" || echo "No Python files found"
 
-# Copy files from the Pi Zero directory
+# Copy files from the Pi Zero directory with better error handling
 echo "📋 Copying files..."
-cp "$SCRIPT_DIR/PiScript" ~/WRB/ 2>/dev/null && echo "✅ PiScript copied" || echo "⚠️  PiScript not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/config.py" ~/WRB/ 2>/dev/null && echo "✅ config.py copied" || echo "⚠️  config.py not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/monitor_system.py" ~/WRB/ 2>/dev/null && echo "✅ monitor_system.py copied" || echo "⚠️  monitor_system.py not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/test_esp32_connection.py" ~/WRB/ 2>/dev/null && echo "✅ test_esp32_connection.py copied" || echo "⚠️  test_esp32_connection.py not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/test_system_integration.py" ~/WRB/ 2>/dev/null && echo "✅ test_system_integration.py copied" || echo "⚠️  test_system_integration.py not found in $SCRIPT_DIR"
-cp "$SCRIPT_DIR/requirements.txt" ~/WRB/ 2>/dev/null && echo "✅ requirements.txt copied" || echo "⚠️  requirements.txt not found in $SCRIPT_DIR"
+FILES_COPIED=0
+
+# Copy PiScript
+if [ -f "$SCRIPT_DIR/PiScript" ]; then
+    cp "$SCRIPT_DIR/PiScript" ~/WRB/ && echo "✅ PiScript copied" && ((FILES_COPIED++))
+else
+    echo "⚠️  PiScript not found in $SCRIPT_DIR"
+fi
+
+# Copy config.py
+if [ -f "$SCRIPT_DIR/config.py" ]; then
+    cp "$SCRIPT_DIR/config.py" ~/WRB/ && echo "✅ config.py copied" && ((FILES_COPIED++))
+else
+    echo "⚠️  config.py not found in $SCRIPT_DIR"
+fi
+
+# Copy other Python files (optional)
+for file in monitor_system.py test_esp32_connection.py test_system_integration.py; do
+    if [ -f "$SCRIPT_DIR/$file" ]; then
+        cp "$SCRIPT_DIR/$file" ~/WRB/ && echo "✅ $file copied" && ((FILES_COPIED++))
+    else
+        echo "⚠️  $file not found in $SCRIPT_DIR"
+    fi
+done
+
+# Copy requirements.txt
+if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+    cp "$SCRIPT_DIR/requirements.txt" ~/WRB/ && echo "✅ requirements.txt copied" && ((FILES_COPIED++))
+else
+    echo "⚠️  requirements.txt not found in $SCRIPT_DIR"
+fi
 
 # Copy default sound files if they exist
 if [ -d "$SCRIPT_DIR/default_sounds" ]; then
     echo "🎵 Copying default sound files..."
-    cp "$SCRIPT_DIR/default_sounds"/*.wav ~/WRB/sounds/ 2>/dev/null && echo "✅ Default sounds copied" || echo "⚠️  Could not copy default sounds"
+    cp "$SCRIPT_DIR/default_sounds"/*.wav ~/WRB/sounds/ 2>/dev/null && echo "✅ Default sounds copied" && ((FILES_COPIED++))
 else
     echo "📁 No default_sounds directory found in $SCRIPT_DIR"
 fi
 
+echo "📊 Files copied: $FILES_COPIED"
+
 # Step 5: Set permissions
 echo "🔐 Setting file permissions..."
 
-# Check if files were copied successfully, if not try alternative locations
+# Check if essential files were copied successfully
 if [ ! -f ~/WRB/PiScript ]; then
     echo "⚠️  PiScript not found, trying alternative locations..."
     
@@ -114,6 +141,9 @@ if [ ! -f ~/WRB/PiScript ]; then
         if [ -d ~/TheBigWRB/Pi\ Zero/default_sounds ]; then
             cp ~/TheBigWRB/Pi\ Zero/default_sounds/*.wav ~/WRB/sounds/ 2>/dev/null && echo "✅ Default sounds copied from TheBigWRB"
         fi
+    else
+        echo "❌ PiScript still not found after all attempts"
+        echo "⚠️  Installation will continue, but you may need to manually copy PiScript"
     fi
 fi
 
@@ -129,78 +159,47 @@ chmod +x ~/WRB/*.py 2>/dev/null && echo "✅ Python files permissions set" || ec
 
 # Step 6: Install Python dependencies
 echo "🐍 Installing Python dependencies..."
-# Try pip first, fall back to apt if externally managed environment
-if ! pip3 install -r ~/WRB/requirements.txt 2>/dev/null; then
-    echo "⚠️  pip install failed (externally managed environment detected)"
-    echo "📦 Installing Python packages via apt instead..."
-    
-    # Install the specific packages we need via apt
-    sudo apt install -y python3-pygame python3-serial python3-gpiozero
-    
-    # Check if pygame is working
-    python3 -c "import pygame; print('pygame version:', pygame.version.ver)" 2>/dev/null || {
-        echo "⚠️  pygame not found, trying alternative installation..."
-        # Try using --break-system-packages as last resort
-        pip3 install pygame --break-system-packages 2>/dev/null || echo "❌ Could not install pygame"
+
+# Install required packages via apt (more reliable than pip)
+echo "📦 Installing Python packages via apt..."
+sudo apt install -y python3-pygame python3-serial python3-gpiozero python3-pip
+
+# Try to install additional packages via pip if requirements.txt exists
+if [ -f ~/WRB/requirements.txt ]; then
+    echo "📦 Installing additional packages from requirements.txt..."
+    pip3 install -r ~/WRB/requirements.txt --break-system-packages 2>/dev/null || {
+        echo "⚠️  Some pip packages failed, but core packages are installed via apt"
     }
-    
-    echo "✅ Python packages installed via apt"
 else
-    echo "✅ Python packages installed via pip"
+    echo "⚠️  requirements.txt not found, using apt packages only"
 fi
+
+# Verify pygame installation
+echo "🧪 Testing pygame installation..."
+if python3 -c "import pygame; print('pygame version:', pygame.version.ver)" 2>/dev/null; then
+    echo "✅ pygame is working correctly"
+else
+    echo "❌ pygame installation failed, trying alternative method..."
+    # Try installing pygame via pip as fallback
+    pip3 install pygame --break-system-packages 2>/dev/null || {
+        echo "❌ Could not install pygame - manual installation may be required"
+    }
+fi
+
+echo "✅ Python dependencies installation completed"
 
 # Step 7: Audio setup
 echo "🔊 Setting up audio..."
 sudo usermod -a -G audio $USER
 
-# Apply USB audio fix to prevent sound cutoff at beginning
-echo "🔧 Applying USB audio fix..."
-echo "   This fixes the issue where audio is cut off at the beginning of playback"
-echo "   Optimized for USB audio cards (not HDMI)"
+# Basic audio setup for USB audio interface
+echo "🔊 Setting up basic audio configuration..."
 
-# Disable PulseAudio suspend-on-idle module (prevents audio cutoff with USB audio)
-echo "🔧 Disabling PulseAudio suspend-on-idle module..."
-if [ -f /etc/pulse/default.pa ]; then
-    sudo sed -i 's/^load-module module-suspend-on-idle/#load-module module-suspend-on-idle/' /etc/pulse/default.pa
-    echo "✅ Disabled suspend-on-idle in system PulseAudio config"
-else
-    echo "⚠️  System PulseAudio config not found, creating user config"
-fi
-
-# Create user-level PulseAudio config to disable suspend-on-idle
-mkdir -p ~/.config/pulse
-cat > ~/.config/pulse/default.pa << 'PULSE_USB_EOF'
-# Custom PulseAudio configuration for USB audio
-# Disable suspend-on-idle to prevent audio cutoff
-# load-module module-suspend-on-idle
-load-module module-device-manager
-load-module module-stream-restore
-load-module module-card-restore
-load-module module-augment-properties
-load-module module-switch-on-port-available
-PULSE_USB_EOF
-
-echo "✅ USB audio fix applied (PulseAudio suspend-on-idle disabled)"
-
-# Create PulseAudio configuration for better compatibility
+# Create basic PulseAudio configuration
 mkdir -p ~/.config/pulse
 cat > ~/.config/pulse/client.conf << 'PULSE_EOF'
 default-server = unix:/run/user/1000/pulse/native
-autospawn = no
-daemon-binary = /bin/true
-enable-shm = false
 PULSE_EOF
-
-# Create ALSA configuration as fallback
-rm -rf ~/.asoundrc
-cat > ~/.asoundrc << 'ALSA_EOF'
-pcm.!default {
-    type pulse
-}
-ctl.!default {
-    type pulse
-}
-ALSA_EOF
 
 # Step 8: Create sample sound files if none exist
 echo "🎵 Checking for sound files..."
@@ -250,7 +249,7 @@ Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=WRB_SERIAL=/dev/ttyACM0
 Environment=SDL_AUDIODRIVER=pulse
 Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
-# USB audio fix is applied in PiScript init_audio() function
+# Standard audio setup
 ExecStart=/usr/bin/python3 /home/wrb01/WRB/PiScript
 Restart=on-failure
 RestartSec=10

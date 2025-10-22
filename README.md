@@ -75,8 +75,6 @@ TheBigWRB/
 - **USB Hot-Swapping**: Automatic detection and use of sound files from USB drives
 - **Local Fallback**: Falls back to local storage if no USB drive is available
 - **Default Sounds**: Sample audio files included for immediate testing
-- **USB Audio Optimizations**: Optimized for USB audio cards with low-latency settings
-- **Audio Cutoff Prevention**: Specialized configuration prevents audio cutoff at beginning of playback
 
 ## Hardware Setup
 
@@ -353,36 +351,12 @@ For detailed installation instructions, see the [Complete Installation Guide](Pi
 ✅ **One-Command Install**: Complete system setup with single command
 ✅ **Release-Based Triggering**: No more double triggers, proper hold detection
 ✅ **Audio Cutoff Fixed**: Keep-open audio system prevents audio cutoffs
-✅ **USB Audio Optimized**: Specialized configuration for USB audio cards
 ✅ **Auto-Start**: System automatically starts on boot with reliability features
 ✅ **Default Sounds**: Sample audio files included for immediate testing
 
 ## License
 
 This project is open source. Feel free to modify and distribute as needed.
-
-## USB Audio Optimizations ⭐ **NEW**
-
-The system now includes specialized optimizations for USB audio cards to prevent audio cutoff issues:
-
-### USB Audio Configuration
-- **Low-Latency Settings**: 25ms fragment size for minimal audio delay
-- **Real-Time Scheduling**: Higher priority audio processing
-- **USB Device Detection**: Automatic selection of USB audio cards
-- **PulseAudio Optimization**: Custom daemon configuration for USB audio
-- **Buffer Management**: Optimized audio buffers to prevent cutoff
-
-### Audio Fix Features
-- **Automatic USB Detection**: Scripts automatically detect and configure USB audio devices
-- **PulseAudio Restart**: Clean audio initialization on service start
-- **ALSA Configuration**: Proper USB audio device mapping
-- **Manual Fix Script**: `apply_audio_fix.sh` for manual USB audio optimization
-
-### Installation Includes
-- USB audio optimizations applied during installation
-- Systemd service configured for USB audio
-- Manual fix script for troubleshooting
-- Optimized pygame mixer settings for USB audio cards
 
 ## Raspberry Pi Integration
 

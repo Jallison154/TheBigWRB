@@ -17,31 +17,58 @@ except ImportError:
     MIX_BUF=512
     RESCAN_SEC=1.0
 
-# Audio device (your USB card is card0)
+# Audio device configuration
 os.environ.setdefault("SDL_AUDIODRIVER","alsa")
-os.environ.setdefault("AUDIODEV","plughw:0,0")
 
 print(f"[WRB] Configuration: BAUD={BAUD}, SERIAL={SERIAL}, READY_PIN={READY_PIN}", flush=True)
 
 def usb_mount_dirs():
+    """Find all mounted USB drives"""
     base="/media"
-    return [os.path.join(base,d) for d in sorted(os.listdir(base)) 
-            if os.path.isdir(os.path.join(base,d)) and os.path.ismount(os.path.join(base,d))] if os.path.isdir(base) else []
+    if not os.path.isdir(base):
+        return []
+    
+    mounted_dirs = []
+    try:
+        for d in sorted(os.listdir(base)):
+            full_path = os.path.join(base, d)
+            if os.path.isdir(full_path) and os.path.ismount(full_path):
+                mounted_dirs.append(full_path)
+                print(f"[WRB] Found mounted USB drive: {full_path}", flush=True)
+    except Exception as e:
+        print(f"[WRB] Error scanning USB drives: {e}", flush=True)
+    
+    return mounted_dirs
 
 def pick_source():
-    # Prefer USB with files; fall back to local
+    """Select audio source: USB drives first, then local storage"""
+    print("[WRB] Scanning for audio sources...", flush=True)
+    
+    # Check USB drives first
     for mnt in usb_mount_dirs():
+        print(f"[WRB] Checking USB drive: {mnt}", flush=True)
         B1=sorted(glob.glob(os.path.join(mnt,"button1*.wav")))
         B2=sorted(glob.glob(os.path.join(mnt,"button2*.wav")))
         H1=sorted(glob.glob(os.path.join(mnt,"hold1*.wav")))
         H2=sorted(glob.glob(os.path.join(mnt,"hold2*.wav")))
+        
         if B1 or B2 or H1 or H2:
+            print(f"[WRB] Using USB drive: {mnt} (button1={len(B1)}, button2={len(B2)}, hold1={len(H1)}, hold2={len(H2)})", flush=True)
             return (f"USB:{mnt}", mnt, B1[:1], B2, H1[:1], H2)
-    local=os.path.expanduser("~/WRB/sounds"); os.makedirs(local, exist_ok=True)
+        else:
+            print(f"[WRB] No audio files found on {mnt}", flush=True)
+    
+    # Fall back to local storage
+    local=os.path.expanduser("~/WRB/sounds")
+    os.makedirs(local, exist_ok=True)
+    print(f"[WRB] Checking local storage: {local}", flush=True)
+    
     B1=sorted(glob.glob(os.path.join(local,"button1*.wav")))
     B2=sorted(glob.glob(os.path.join(local,"button2*.wav")))
     H1=sorted(glob.glob(os.path.join(local,"hold1*.wav")))
     H2=sorted(glob.glob(os.path.join(local,"hold2*.wav")))
+    
+    print(f"[WRB] Using local storage (button1={len(B1)}, button2={len(B2)}, hold1={len(H1)}, hold2={len(H2)})", flush=True)
     return ("LOCAL", local, B1[:1], B2, H1[:1], H2)
 
 def load_sounds(B1, B2, H1, H2):
@@ -61,45 +88,37 @@ def classify(s):
     if "BTN2" in u: return 'B2'
     return None
 
+def fade_out_sound(channel, duration=2.0):
+    """Fade out a sound over the specified duration"""
+    import threading
+    import time
+    
+    def fade_thread():
+        start_volume = 1.0
+        steps = int(duration * 10)  # 10 steps per second
+        step_delay = duration / steps
+        
+        for i in range(steps + 1):
+            volume = start_volume * (1.0 - (i / steps))
+            channel.set_volume(volume)
+            time.sleep(step_delay)
+        
+        # Stop the channel after fade
+        channel.stop()
+        print(f"[WRB] Sound faded out over {duration}s", flush=True)
+    
+    # Start fade in background thread
+    thread = threading.Thread(target=fade_thread, daemon=True)
+    thread.start()
+    return thread
+
 def init_audio():
-    """Initialize pygame mixer once and keep it open with USB audio optimizations"""
+    """Initialize pygame mixer once and keep it open"""
     import pygame
     try:
-        # Apply USB audio fix before initializing pygame
-        print("[WRB] Applying USB audio fix...", flush=True)
-        try:
-            import subprocess
-            # Disable PulseAudio suspend-on-idle module (prevents audio cutoff)
-            subprocess.run(['pulseaudio', '--kill'], check=False)
-            time.sleep(1)
-            subprocess.run(['pulseaudio', '--start'], check=False)
-            print("[WRB] PulseAudio restarted with USB audio optimizations", flush=True)
-        except:
-            print("[WRB] Could not restart PulseAudio, continuing...", flush=True)
-        
-        # USB audio optimizations for pygame mixer
-        pygame.mixer.pre_init(
-            frequency=MIX_FREQ, 
-            size=-16, 
-            channels=2, 
-            buffer=MIX_BUF,
-            allowedchanges=0  # Prevent pygame from changing audio settings
-        )
-        pygame.mixer.init()
+        pygame.mixer.init(frequency=MIX_FREQ, size=-16, channels=2, buffer=MIX_BUF)
         pygame.mixer.set_num_channels(16)
-        
-        # Set audio device to USB audio if available
-        try:
-            # Check for USB audio devices
-            result = subprocess.run(['aplay', '-l'], capture_output=True, text=True)
-            if 'USB' in result.stdout:
-                print("[WRB] USB audio device detected", flush=True)
-                # Set environment for USB audio
-                os.environ['AUDIODEV'] = 'plughw:0,0'  # Use first USB audio device
-        except:
-            pass  # Continue if USB detection fails
-            
-        print("[WRB] audio: mixer ready with USB optimizations", flush=True)
+        print("[WRB] audio: mixer ready", flush=True)
         return True
     except Exception as e:
         print(f"[WRB] audio init failed: {e}", flush=True)
@@ -159,16 +178,34 @@ def main():
     
     print("[WRB] READY - LED at 25% brightness", flush=True)
     last_scan=time.time()
+    
+    # Double-tap detection variables
+    last_button_press = {'B1': 0, 'B2': 0}
+    double_tap_threshold = 0.5  # 500ms window for double-tap
+    fade_threads = []  # Track active fade threads
 
     while True:
-        # Hot-swap USB/local
+        # Hot-swap USB/local - check for changes every RESCAN_SEC seconds
         if time.time()-last_scan > RESCAN_SEC:
+            print(f"[WRB] Scanning for audio source changes...", flush=True)
             new_tag, new_base, nB1, nB2, nH1, nH2 = pick_source()
+            
+            # Check if source has changed
             if (new_tag != src_tag) or (nB1 != B1) or (nB2 != B2) or (nH1 != H1) or (nH2 != H2):
-                for ch in range(0,15): pygame.mixer.Channel(ch).stop()
+                print(f"[WRB] Audio source changed from {src_tag} to {new_tag}", flush=True)
+                
+                # Stop all currently playing sounds
+                for ch in range(0,15): 
+                    pygame.mixer.Channel(ch).stop()
+                
+                # Load new sounds
                 BUTTON1, BUTTON2, HOLD1, HOLD2 = load_sounds(nB1, nB2, nH1, nH2)
                 src_tag, base, B1, B2, H1, H2 = new_tag, new_base, nB1, nB2, nH1, nH2
-                print(f"[WRB] reloaded: source={src_tag} button1={B1[:1]} button2={len(BUTTON2)} hold1={H1[:1]} hold2={len(HOLD2)}", flush=True)
+                
+                print(f"[WRB] Audio source updated: {src_tag} (button1={B1[:1]}, button2={len(BUTTON2)}, hold1={H1[:1]}, hold2={len(HOLD2)})", flush=True)
+            else:
+                print(f"[WRB] No audio source changes detected", flush=True)
+            
             last_scan=time.time()
 
         try: line=ser.readline().decode(errors="ignore")
@@ -176,26 +213,66 @@ def main():
         if not line: continue
             
         t=classify(line)
+        current_time = time.time()
+        
         if t=='B1':
-            if BUTTON1: pygame.mixer.Channel(0).play(BUTTON1)
-            print("[WRB] BUTTON1 (src=%s loaded=%s)"%(src_tag,bool(BUTTON1)), flush=True)
-            try: 
-                # Blink to 100% brightness
-                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
-                time.sleep(0.1)
-                # Return to 25% brightness
-                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
-            except: pass
+            # Check for double-tap
+            if current_time - last_button_press['B1'] < double_tap_threshold:
+                print("[WRB] DOUBLE-TAP B1 - Fading out all sounds", flush=True)
+                # Fade out all playing sounds
+                for ch in range(0, 15):
+                    if pygame.mixer.Channel(ch).get_busy():
+                        fade_threads.append(fade_out_sound(pygame.mixer.Channel(ch), 2.0))
+                # LED feedback for double-tap
+                try:
+                    for _ in range(3):  # Triple blink for double-tap
+                        led.value = 0.0 if READY_ACTIVE_LOW else 1.0
+                        time.sleep(0.1)
+                        led.value = 0.75 if READY_ACTIVE_LOW else 0.25
+                        time.sleep(0.1)
+                except: pass
+            else:
+                # Normal button press
+                if BUTTON1: pygame.mixer.Channel(0).play(BUTTON1)
+                print("[WRB] BUTTON1 (src=%s loaded=%s)"%(src_tag,bool(BUTTON1)), flush=True)
+                try: 
+                    # Blink to 100% brightness
+                    led.value = 0.0 if READY_ACTIVE_LOW else 1.0
+                    time.sleep(0.1)
+                    # Return to 25% brightness
+                    led.value = 0.75 if READY_ACTIVE_LOW else 0.25
+                except: pass
+            last_button_press['B1'] = current_time
+            
         elif t=='B2':
-            if BUTTON2: pygame.mixer.Channel(1).play(random.choice(BUTTON2))
-            print("[WRB] BUTTON2 (src=%s loaded=%d)"%(src_tag,len(BUTTON2)), flush=True)
-            try: 
-                # Blink to 100% brightness
-                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
-                time.sleep(0.1)
-                # Return to 25% brightness
-                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
-            except: pass
+            # Check for double-tap
+            if current_time - last_button_press['B2'] < double_tap_threshold:
+                print("[WRB] DOUBLE-TAP B2 - Fading out all sounds", flush=True)
+                # Fade out all playing sounds
+                for ch in range(0, 15):
+                    if pygame.mixer.Channel(ch).get_busy():
+                        fade_threads.append(fade_out_sound(pygame.mixer.Channel(ch), 2.0))
+                # LED feedback for double-tap
+                try:
+                    for _ in range(3):  # Triple blink for double-tap
+                        led.value = 0.0 if READY_ACTIVE_LOW else 1.0
+                        time.sleep(0.1)
+                        led.value = 0.75 if READY_ACTIVE_LOW else 0.25
+                        time.sleep(0.1)
+                except: pass
+            else:
+                # Normal button press
+                if BUTTON2: pygame.mixer.Channel(1).play(random.choice(BUTTON2))
+                print("[WRB] BUTTON2 (src=%s loaded=%d)"%(src_tag,len(BUTTON2)), flush=True)
+                try: 
+                    # Blink to 100% brightness
+                    led.value = 0.0 if READY_ACTIVE_LOW else 1.0
+                    time.sleep(0.1)
+                    # Return to 25% brightness
+                    led.value = 0.75 if READY_ACTIVE_LOW else 0.25
+                except: pass
+            last_button_press['B2'] = current_time
+            
         elif t=='H1':
             if HOLD1: pygame.mixer.Channel(2).play(HOLD1)
             print("[WRB] HOLD1 (src=%s loaded=%s)"%(src_tag,bool(HOLD1)), flush=True)
