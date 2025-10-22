@@ -212,7 +212,7 @@ echo "⚙️ Installing systemd service..."
 ACTUAL_USER=$(whoami)
 echo "🔧 Using username: $ACTUAL_USER"
 
-sudo tee /etc/systemd/system/WRB-enhanced.service >/dev/null << 'SERVICE_EOF'
+sudo tee /etc/systemd/system/WRB-enhanced.service >/dev/null << SERVICE_EOF
 [Unit]
 Description=WRB Enhanced Audio System
 After=network.target sound.target
@@ -223,17 +223,17 @@ StartLimitAction=none
 
 [Service]
 Type=simple
-User=wrb01
+User=$ACTUAL_USER
 Group=audio
-WorkingDirectory=/home/wrb01/WRB
-Environment=HOME=/home/wrb01
-Environment=USER=wrb01
+WorkingDirectory=/home/$ACTUAL_USER/WRB
+Environment=HOME=/home/$ACTUAL_USER
+Environment=USER=$ACTUAL_USER
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=WRB_SERIAL=/dev/ttyACM0
 Environment=SDL_AUDIODRIVER=pulse
 Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
 # Standard audio setup
-ExecStart=/usr/bin/python3 /home/wrb01/WRB/PiScript
+ExecStart=/usr/bin/python3 /home/$ACTUAL_USER/WRB/PiScript
 Restart=on-failure
 RestartSec=10
 RestartPreventExitStatus=1
@@ -254,7 +254,7 @@ sudo systemctl start WRB-enhanced.service
 
 # Additional reliability: Create a startup script that ensures service starts
 echo "🔧 Creating auto-start reliability script..."
-sudo tee /etc/systemd/system/WRB-auto-start.service >/dev/null << 'AUTO_START_EOF'
+sudo tee /etc/systemd/system/WRB-auto-start.service >/dev/null << AUTO_START_EOF
 [Unit]
 Description=WRB Auto-Start Service
 After=network.target
@@ -312,7 +312,7 @@ WATCHDOG_EOF
 sudo chmod +x /usr/local/bin/WRB-watchdog.sh
 
 # Create watchdog service
-sudo tee /etc/systemd/system/WRB-watchdog.service >/dev/null << 'WATCHDOG_SERVICE_EOF'
+sudo tee /etc/systemd/system/WRB-watchdog.service >/dev/null << WATCHDOG_SERVICE_EOF
 [Unit]
 Description=WRB Service Watchdog
 After=network.target
@@ -390,4 +390,15 @@ echo "  - Service auto-starts on boot"
 echo "  - Watchdog monitors and restarts if needed"
 echo "  - Backup auto-start service as failsafe"
 echo "  - Multiple restart attempts with backoff"
+echo ""
+echo "🔧 TROUBLESHOOTING AUTO-START ISSUES:"
+echo "  If service doesn't auto-start on boot:"
+echo "  1. Check service status: sudo systemctl status WRB-enhanced.service"
+echo "  2. Check if enabled: sudo systemctl is-enabled WRB-enhanced.service"
+echo "  3. Check logs: sudo journalctl -u WRB-enhanced.service -f"
+echo "  4. Manually start: sudo systemctl start WRB-enhanced.service"
+echo "  5. Re-enable: sudo systemctl enable WRB-enhanced.service"
+echo "  6. Check file permissions: ls -la ~/WRB/PiScript"
+echo "  7. Check user exists: id $ACTUAL_USER"
+echo "  8. Check audio group: groups $ACTUAL_USER"
 echo ""
