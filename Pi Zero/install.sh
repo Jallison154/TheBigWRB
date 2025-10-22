@@ -153,6 +153,64 @@ fi
 echo "🔊 Setting up audio..."
 sudo usermod -a -G audio $USER
 
+# Apply USB audio optimizations to prevent sound cutoff at beginning
+echo "🔧 Applying USB audio optimizations..."
+# Set USB audio buffer size to prevent cutoff
+echo "🔊 Configuring USB audio for optimal performance..."
+
+# Create ALSA configuration for USB audio optimization
+sudo tee /etc/asound.conf >/dev/null << 'ALSA_USB_EOF'
+# USB Audio Configuration for WRB System
+# Optimized to prevent audio cutoff at beginning of playback
+
+pcm.!default {
+    type pulse
+    hint {
+        show on
+        description "Default ALSA Output (currently PulseAudio)"
+    }
+}
+
+ctl.!default {
+    type pulse
+}
+
+# USB Audio specific configuration
+pcm.usb_audio {
+    type hw
+    card 0
+    device 0
+}
+
+# PulseAudio configuration for USB audio
+pcm.pulse {
+    type pulse
+}
+
+ctl.pulse {
+    type pulse
+}
+ALSA_USB_EOF
+
+# Create PulseAudio daemon configuration for USB audio optimization
+mkdir -p ~/.config/pulse
+cat > ~/.config/pulse/daemon.conf << 'PULSE_USB_EOF'
+# PulseAudio daemon configuration optimized for USB audio
+default-sample-rate = 44100
+default-sample-format = s16le
+default-sample-channels = 2
+default-fragments = 4
+default-fragment-size-msec = 25
+high-priority = yes
+nice-level = -11
+realtime-scheduling = yes
+realtime-priority = 9
+rlimit-rtprio = 9
+daemonize = no
+PULSE_USB_EOF
+
+echo "✅ USB audio optimizations applied"
+
 # Create PulseAudio configuration for better compatibility
 mkdir -p ~/.config/pulse
 cat > ~/.config/pulse/client.conf << 'PULSE_EOF'
@@ -221,6 +279,8 @@ Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=WRB_SERIAL=/dev/ttyACM0
 Environment=SDL_AUDIODRIVER=pulse
 Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
+# Apply USB audio optimizations before starting the service
+ExecStartPre=/bin/bash -c 'pulseaudio --kill && sleep 1 && pulseaudio --start'
 ExecStart=/usr/bin/python3 /home/wrb01/WRB/PiScript
 Restart=on-failure
 RestartSec=10

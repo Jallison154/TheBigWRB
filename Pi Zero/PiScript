@@ -62,12 +62,33 @@ def classify(s):
     return None
 
 def init_audio():
-    """Initialize pygame mixer once and keep it open"""
+    """Initialize pygame mixer once and keep it open with USB audio optimizations"""
     import pygame
     try:
-        pygame.mixer.init(frequency=MIX_FREQ, size=-16, channels=2, buffer=MIX_BUF)
+        # USB audio optimizations for pygame mixer
+        pygame.mixer.pre_init(
+            frequency=MIX_FREQ, 
+            size=-16, 
+            channels=2, 
+            buffer=MIX_BUF,
+            allowedchanges=0  # Prevent pygame from changing audio settings
+        )
+        pygame.mixer.init()
         pygame.mixer.set_num_channels(16)
-        print("[WRB] audio: mixer ready", flush=True)
+        
+        # Set audio device to USB audio if available
+        try:
+            import subprocess
+            # Check for USB audio devices
+            result = subprocess.run(['aplay', '-l'], capture_output=True, text=True)
+            if 'USB' in result.stdout:
+                print("[WRB] USB audio device detected", flush=True)
+                # Set environment for USB audio
+                os.environ['AUDIODEV'] = 'plughw:0,0'  # Use first USB audio device
+        except:
+            pass  # Continue if USB detection fails
+            
+        print("[WRB] audio: mixer ready with USB optimizations", flush=True)
         return True
     except Exception as e:
         print(f"[WRB] audio init failed: {e}", flush=True)

@@ -1,7 +1,7 @@
 [Unit]
 Description=WRB Enhanced Audio System
-After=network.target
-Wants=network.target
+After=network.target sound.target
+Wants=network.target sound.target
 
 [Service]
 Type=simple
@@ -14,6 +14,8 @@ Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=WRB_SERIAL=/dev/ttyACM0
 Environment=SDL_AUDIODRIVER=pulse
 Environment=PULSE_RUNTIME_PATH=/run/user/1000/pulse
+# Apply USB audio optimizations before starting the service
+ExecStartPre=/bin/bash -c 'pulseaudio --kill && sleep 1 && pulseaudio --start'
 ExecStart=/usr/bin/python3 /home/wrb01/WRB/PiScript
 Restart=always
 RestartSec=5
