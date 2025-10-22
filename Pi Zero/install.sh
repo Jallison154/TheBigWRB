@@ -110,8 +110,12 @@ if [ ! -f ~/WRB/PiScript ]; then
     exit 1
 fi
 
-# Step 5: Set permissions
-echo "🔐 Setting file permissions..."
+# Step 5: Set permissions and ensure directory structure
+echo "🔐 Setting file permissions and ensuring directory structure..."
+
+# Ensure WRB directory exists
+mkdir -p ~/WRB/sounds
+echo "✅ WRB directory structure ensured"
 
 # If essential files are missing, provide clear error message
 if [ ! -f ~/WRB/PiScript ]; then
@@ -139,6 +143,10 @@ else
 fi
 
 chmod +x ~/WRB/*.py 2>/dev/null && echo "✅ Python files permissions set" || echo "⚠️  No Python files found to set permissions"
+
+# Set proper ownership
+chown -R $ACTUAL_USER:$ACTUAL_USER ~/WRB
+echo "✅ File ownership set to $ACTUAL_USER"
 
 # Step 6: Install Python dependencies
 echo "🐍 Installing Python dependencies..."
@@ -248,9 +256,21 @@ SERVICE_EOF
 
 # Step 10: Enable and start service with auto-start
 echo "🚀 Starting service with auto-start on boot..."
+
+# Reset any failed services first
+echo "🔄 Resetting any failed services..."
+sudo systemctl reset-failed WRB-enhanced.service 2>/dev/null || true
+
+# Reload systemd configuration
 sudo systemctl daemon-reload
+
+# Enable services
 sudo systemctl enable WRB-enhanced.service
+echo "✅ WRB-enhanced.service enabled for auto-start"
+
+# Start services
 sudo systemctl start WRB-enhanced.service
+echo "✅ WRB-enhanced.service started"
 
 # Additional reliability: Create a startup script that ensures service starts
 echo "🔧 Creating auto-start reliability script..."
@@ -335,7 +355,7 @@ sudo systemctl start WRB-watchdog.service
 
 # Step 11: Wait and check status
 echo "⏳ Waiting for service to start..."
-sleep 3
+sleep 5
 
 echo ""
 echo "=========================================="
@@ -346,6 +366,27 @@ echo ""
 # Check service status
 echo "📊 Service Status:"
 sudo systemctl status WRB-enhanced.service --no-pager
+
+# Verify files exist and have correct permissions
+echo ""
+echo "🔍 File Verification:"
+if [ -f ~/WRB/PiScript ]; then
+    echo "✅ PiScript exists: $(ls -la ~/WRB/PiScript)"
+else
+    echo "❌ PiScript missing"
+fi
+
+if [ -f ~/WRB/config.py ]; then
+    echo "✅ config.py exists"
+else
+    echo "⚠️  config.py missing (using defaults)"
+fi
+
+echo ""
+echo "👤 User and Permission Check:"
+echo "   Current user: $ACTUAL_USER"
+echo "   User groups: $(groups $ACTUAL_USER)"
+echo "   Audio group: $(groups $ACTUAL_USER | grep -o audio || echo 'Not in audio group')"
 
 echo ""
 echo "🔍 Auto-Start Services Status:"

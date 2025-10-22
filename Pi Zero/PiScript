@@ -167,6 +167,14 @@ def main():
     
     print("[WRB] Starting WRB Enhanced Audio System...", flush=True)
     
+    # Ensure we're in the correct working directory
+    try:
+        os.chdir(os.path.expanduser("~/WRB"))
+        print(f"[WRB] Working directory set to: {os.getcwd()}", flush=True)
+    except Exception as e:
+        print(f"[WRB] Warning: Could not change to ~/WRB directory: {e}", flush=True)
+        print(f"[WRB] Current working directory: {os.getcwd()}", flush=True)
+    
     # Initialize LEDs
     led = PWMLED(READY_PIN, active_high=(not READY_ACTIVE_LOW))
     usb_led = LED(USB_LED_PIN, active_high=(not USB_LED_ACTIVE_LOW))
