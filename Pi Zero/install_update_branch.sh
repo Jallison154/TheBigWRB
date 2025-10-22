@@ -1,11 +1,11 @@
 #!/bin/bash
-# Complete WRB Pi Installation Script
-# This single script handles everything needed for installation
+# WRB Pi Installation Script for Update-1.0 Branch
+# This script handles installation from the Update-1.0 branch
 
 set -e  # Exit on any error
 
 echo "=========================================="
-echo "  WRB Pi Installation Script"
+echo "  WRB Pi Installation Script (Update-1.0)"
 echo "=========================================="
 echo ""
 
@@ -31,12 +31,12 @@ if [ ! -f "PiScript" ]; then
         cd "~/TheBigWRB/Pi Zero"
     else
         echo "❌ PiScript not found. Please run this from the Pi Zero directory or clone the repository first."
-        echo "   Try: git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB"
+        echo "   Try: git clone -b Update-1.0 https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB"
         exit 1
     fi
 fi
 
-echo "✅ Starting WRB Pi installation..."
+echo "✅ Starting WRB Pi installation from Update-1.0 branch..."
 echo ""
 
 # Step 1: Update system
@@ -60,27 +60,16 @@ if [ ! -d ".git" ]; then
     git remote add origin https://github.com/Jallison154/TheBigWRB.git
     git config pull.rebase false
     echo "✅ Git repository initialized"
-    
-    # Try to checkout Update-1.0 branch if it exists
-    echo "🌿 Attempting to checkout Update-1.0 branch..."
-    if git fetch origin Update-1.0 2>/dev/null; then
-        git checkout -b Update-1.0 origin/Update-1.0 2>/dev/null && echo "✅ Update-1.0 branch checked out" || echo "⚠️  Update-1.0 branch not available, using main branch"
-    else
-        echo "⚠️  Update-1.0 branch not found, using main branch"
-    fi
 else
     echo "✅ Git repository already exists"
-    # Check if we're on Update-1.0 branch, if not try to switch
-    CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
-    if [ "$CURRENT_BRANCH" != "Update-1.0" ]; then
-        echo "🌿 Attempting to switch to Update-1.0 branch..."
-        if git fetch origin Update-1.0 2>/dev/null && git checkout Update-1.0 2>/dev/null; then
-            echo "✅ Switched to Update-1.0 branch"
-        else
-            echo "⚠️  Update-1.0 branch not available, staying on $CURRENT_BRANCH"
-        fi
-    fi
 fi
+
+# Fetch and checkout the Update-1.0 branch
+echo "🌿 Fetching Update-1.0 branch..."
+git fetch origin Update-1.0
+git checkout -b Update-1.0 origin/Update-1.0 2>/dev/null || git checkout Update-1.0
+echo "✅ Update-1.0 branch checked out"
+
 # Don't change back to ~ yet - stay in the script directory
 
 # Step 4: Copy all files
@@ -221,7 +210,7 @@ echo "🔧 Using username: $ACTUAL_USER"
 
 sudo tee /etc/systemd/system/WRB-enhanced.service >/dev/null << 'SERVICE_EOF'
 [Unit]
-Description=WRB Enhanced Audio System
+Description=WRB Enhanced Audio System (Update-1.0)
 After=network.target sound.target
 Wants=network.target sound.target
 StartLimitInterval=300
@@ -262,7 +251,7 @@ sudo systemctl start WRB-enhanced.service
 echo "🔧 Creating auto-start reliability script..."
 sudo tee /etc/systemd/system/WRB-auto-start.service >/dev/null << 'AUTO_START_EOF'
 [Unit]
-Description=WRB Auto-Start Service
+Description=WRB Auto-Start Service (Update-1.0)
 After=network.target
 Wants=network.target
 
@@ -284,7 +273,7 @@ sudo systemctl start WRB-auto-start.service
 echo "🐕 Creating watchdog script..."
 sudo tee /usr/local/bin/WRB-watchdog.sh >/dev/null << 'WATCHDOG_EOF'
 #!/bin/bash
-# WRB Service Watchdog Script
+# WRB Service Watchdog Script (Update-1.0)
 # This script monitors the WRB service and restarts it if it fails
 
 LOG_FILE="/var/log/WRB-watchdog.log"
@@ -320,7 +309,7 @@ sudo chmod +x /usr/local/bin/WRB-watchdog.sh
 # Create watchdog service
 sudo tee /etc/systemd/system/WRB-watchdog.service >/dev/null << 'WATCHDOG_SERVICE_EOF'
 [Unit]
-Description=WRB Service Watchdog
+Description=WRB Service Watchdog (Update-1.0)
 After=network.target
 Wants=network.target
 
@@ -345,7 +334,7 @@ sleep 3
 
 echo ""
 echo "=========================================="
-echo "  Installation Complete!"
+echo "  Installation Complete! (Update-1.0)"
 echo "=========================================="
 echo ""
 
@@ -359,7 +348,7 @@ sudo systemctl status WRB-auto-start.service --no-pager
 sudo systemctl status WRB-watchdog.service --no-pager
 
 echo ""
-echo "🎉 WRB Pi system is now installed with MAXIMUM RELIABILITY!"
+echo "🎉 WRB Pi system is now installed with MAXIMUM RELIABILITY from Update-1.0 branch!"
 echo ""
 echo "🚀 RELIABILITY FEATURES INSTALLED:"
 echo "  ✅ Auto-start on boot (WRB-enhanced.service)"
@@ -367,6 +356,7 @@ echo "  ✅ Backup auto-start service (WRB-auto-start.service)"
 echo "  ✅ Watchdog monitoring (WRB-watchdog.service)"
 echo "  ✅ Automatic restart on failure"
 echo "  ✅ Service health monitoring every 30 seconds"
+echo "  ✅ Update-1.0 branch features"
 echo ""
 echo "📋 Useful Commands:"
 echo "  Check main service:    sudo systemctl status WRB-enhanced.service"
@@ -391,9 +381,15 @@ echo "  The system will automatically start after reboot:"
 echo "  sudo reboot"
 echo "  # After reboot, check: sudo systemctl status WRB-enhanced.service"
 echo ""
+echo "🌿 BRANCH INFO:"
+echo "  Current branch: Update-1.0"
+echo "  Repository: https://github.com/Jallison154/TheBigWRB.git"
+echo "  To update: git pull origin Update-1.0"
+echo ""
 echo "🛡️  MAXIMUM RELIABILITY ACHIEVED!"
 echo "  - Service auto-starts on boot"
 echo "  - Watchdog monitors and restarts if needed"
 echo "  - Backup auto-start service as failsafe"
 echo "  - Multiple restart attempts with backoff"
+echo "  - Update-1.0 branch features included"
 echo ""
