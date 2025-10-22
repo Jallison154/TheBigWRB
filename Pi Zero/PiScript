@@ -1,197 +1,146 @@
 #!/usr/bin/env python3
-import os, glob, time, random, sys, serial
-from gpiozero import LED, PWMLED
+"""
+WRB Pi Script - ESP32 Wireless Button System
+Main script for handling ESP32 communication and audio playback
+"""
 
-# Import configuration
+import os
+import sys
+import time
+import serial
+import pygame
+import glob
+from datetime import datetime
+
+# Configuration
+BAUD = 115200
+SERIAL_PORT = "/dev/ttyACM0"
+READY_PIN = 23
+MIX_FREQ = 44100
+MIX_BUF = 512
+
+# Try to import config
 try:
     from config import *
-    print("[WRB] Loaded configuration from config.py", flush=True)
+    print("[WRB] Loaded configuration from config.py")
 except ImportError:
-    print("[WRB] config.py not found, using defaults", flush=True)
-    # Default values if config.py not found
-    BAUD=115200
-    SERIAL=os.getenv("WRB_SERIAL","/dev/ttyACM0")
-    READY_PIN=23
-    READY_ACTIVE_LOW=True
-    MIX_FREQ=44100
-    MIX_BUF=512
-    RESCAN_SEC=1.0
+    print("[WRB] config.py not found, using defaults")
 
-# Audio device (your USB card is card0)
-os.environ.setdefault("SDL_AUDIODRIVER","alsa")
-os.environ.setdefault("AUDIODEV","plughw:0,0")
+# Initialize pygame mixer
+pygame.mixer.pre_init(frequency=MIX_FREQ, size=-16, channels=2, buffer=MIX_BUF)
+pygame.mixer.init()
+print(f"[WRB] Audio initialized: {MIX_FREQ}Hz, buffer={MIX_BUF}")
 
-print(f"[WRB] Configuration: BAUD={BAUD}, SERIAL={SERIAL}, READY_PIN={READY_PIN}", flush=True)
+# Sound file paths
+SOUNDS_DIR = os.path.expanduser("~/WRB/sounds")
+os.makedirs(SOUNDS_DIR, exist_ok=True)
 
-def usb_mount_dirs():
-    base="/media"
-    return [os.path.join(base,d) for d in sorted(os.listdir(base)) 
-            if os.path.isdir(os.path.join(base,d)) and os.path.ismount(os.path.join(base,d))] if os.path.isdir(base) else []
+def load_sounds():
+    """Load sound files into memory"""
+    sounds = {}
+    
+    # Find sound files
+    button1_files = glob.glob(os.path.join(SOUNDS_DIR, "button1*.wav"))
+    button2_files = glob.glob(os.path.join(SOUNDS_DIR, "button2*.wav"))
+    hold1_files = glob.glob(os.path.join(SOUNDS_DIR, "hold1*.wav"))
+    hold2_files = glob.glob(os.path.join(SOUNDS_DIR, "hold2*.wav"))
+    
+    # Load sounds
+    if button1_files:
+        sounds['button1'] = pygame.mixer.Sound(button1_files[0])
+        print(f"[WRB] Loaded button1: {button1_files[0]}")
+    
+    if button2_files:
+        sounds['button2'] = pygame.mixer.Sound(button2_files[0])
+        print(f"[WRB] Loaded button2: {button2_files[0]}")
+    
+    if hold1_files:
+        sounds['hold1'] = pygame.mixer.Sound(hold1_files[0])
+        print(f"[WRB] Loaded hold1: {hold1_files[0]}")
+    
+    if hold2_files:
+        sounds['hold2'] = pygame.mixer.Sound(hold2_files[0])
+        print(f"[WRB] Loaded hold2: {hold2_files[0]}")
+    
+    return sounds
 
-def pick_source():
-    # Prefer USB with files; fall back to local
-    for mnt in usb_mount_dirs():
-        B1=sorted(glob.glob(os.path.join(mnt,"button1*.wav")))
-        B2=sorted(glob.glob(os.path.join(mnt,"button2*.wav")))
-        H1=sorted(glob.glob(os.path.join(mnt,"hold1*.wav")))
-        H2=sorted(glob.glob(os.path.join(mnt,"hold2*.wav")))
-        if B1 or B2 or H1 or H2:
-            return (f"USB:{mnt}", mnt, B1[:1], B2, H1[:1], H2)
-    local=os.path.expanduser("~/WRB/sounds"); os.makedirs(local, exist_ok=True)
-    B1=sorted(glob.glob(os.path.join(local,"button1*.wav")))
-    B2=sorted(glob.glob(os.path.join(local,"button2*.wav")))
-    H1=sorted(glob.glob(os.path.join(local,"hold1*.wav")))
-    H2=sorted(glob.glob(os.path.join(local,"hold2*.wav")))
-    return ("LOCAL", local, B1[:1], B2, H1[:1], H2)
+def play_sound(sounds, sound_name):
+    """Play a sound if available"""
+    if sound_name in sounds:
+        try:
+            sounds[sound_name].play()
+            print(f"[WRB] Playing {sound_name}")
+        except Exception as e:
+            print(f"[WRB] Error playing {sound_name}: {e}")
+    else:
+        print(f"[WRB] Sound {sound_name} not available")
 
-def load_sounds(B1, B2, H1, H2):
-    """Load pygame Sound objects - keep them in memory for instant playback"""
-    import pygame
-    button1 = pygame.mixer.Sound(B1[0]) if B1 and os.path.exists(B1[0]) else None
-    button2 = [pygame.mixer.Sound(p) for p in B2 if os.path.exists(p)]
-    hold1 = pygame.mixer.Sound(H1[0]) if H1 and os.path.exists(H1[0]) else None
-    hold2 = [pygame.mixer.Sound(p) for p in H2 if os.path.exists(p)]
-    return button1, button2, hold1, hold2
-
-def classify(s):
-    u=s.strip().upper()
-    if "BTN1" in u and "HOLD" in u: return 'H1'
-    if "BTN2" in u and "HOLD" in u: return 'H2'
-    if "BTN1" in u: return 'B1'
-    if "BTN2" in u: return 'B2'
-    return None
-
-def init_audio():
-    """Initialize pygame mixer once and keep it open"""
-    import pygame
+def connect_esp32():
+    """Connect to ESP32 receiver"""
     try:
-        pygame.mixer.init(frequency=MIX_FREQ, size=-16, channels=2, buffer=MIX_BUF)
-        pygame.mixer.set_num_channels(16)
-        print("[WRB] audio: mixer ready", flush=True)
-        return True
+        ser = serial.Serial(SERIAL_PORT, BAUD, timeout=1)
+        print(f"[WRB] Connected to ESP32 on {SERIAL_PORT}")
+        return ser
     except Exception as e:
-        print(f"[WRB] audio init failed: {e}", flush=True)
-        return False
-
-def wait_serial():
-    prefs=[SERIAL,"/dev/ttyACM0","/dev/ttyACM1","/dev/ttyUSB0","/dev/ttyUSB1","/dev/serial0","/dev/ttyAMA0","/dev/ttyS0"]
-    print("[WRB] waiting for serial…", flush=True)
-    while True:
-        for p in prefs:
-            try: return serial.Serial(p, BAUD, timeout=0.1)
-            except: pass
-        time.sleep(0.1)  # Reduced from 0.3 to 0.1 seconds
-
-def breathing_led(led, duration=2.0, steps=20):
-    """Breathing LED effect from 0 to 100% brightness"""
-    import math
-    for i in range(int(steps * 2)):  # 2 cycles
-        # Create smooth breathing curve using sine wave
-        brightness = (math.sin(i * math.pi / steps) + 1) / 2  # 0 to 1
-        if READY_ACTIVE_LOW:
-            # For active low LEDs, invert the brightness
-            brightness = 1 - brightness
-        led.value = brightness
-        time.sleep(duration / (steps * 2))
+        print(f"[WRB] Failed to connect to ESP32: {e}")
+        return None
 
 def main():
-    import pygame
-    from gpiozero import PWMLED
+    """Main application loop"""
+    print("[WRB] Starting WRB Pi Script")
+    print(f"[WRB] Configuration: BAUD={BAUD}, SERIAL={SERIAL_PORT}, READY_PIN={READY_PIN}")
     
-    # Use PWMLED for brightness control instead of regular LED
-    led = PWMLED(READY_PIN, active_high=(not READY_ACTIVE_LOW))
+    # Load sounds
+    sounds = load_sounds()
+    if not sounds:
+        print("[WRB] No sound files found in ~/WRB/sounds/")
+        print("[WRB] Please add button1*.wav, button2*.wav, hold1*.wav, hold2*.wav files")
     
-    print("[WRB] Starting up...", flush=True)
+    # Connect to ESP32
+    ser = connect_esp32()
+    if not ser:
+        print("[WRB] ESP32 not connected, running in simulation mode")
+        print("[WRB] Press Ctrl+C to exit")
+        
+        # Simulation mode - just wait
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n[WRB] Exiting...")
+            sys.exit(0)
     
-    # Quick breathing LED during startup (faster)
-    breathing_led(led, duration=0.8, steps=8)
+    print("[WRB] Ready! Waiting for button presses...")
     
-    print("[WRB] Initializing audio...", flush=True)
-    if not init_audio():
-        print("[WRB] Audio initialization failed, continuing without audio", flush=True)
-    
-    print("[WRB] Loading sound files...", flush=True)
-    src_tag, base, B1, B2, H1, H2 = pick_source()
-    BUTTON1, BUTTON2, HOLD1, HOLD2 = load_sounds(B1, B2, H1, H2)
-    print(f"[WRB] source={src_tag} button1={B1[:1]} button2={len(BUTTON2)} hold1={H1[:1]} hold2={len(HOLD2)}", flush=True)
-
-    print("[WRB] Connecting to ESP32...", flush=True)
-    ser=wait_serial()
-    print(f"[WRB] serial: {ser.port}", flush=True)
-
-    # Set LED to 25% brightness when ready
-    if READY_ACTIVE_LOW:
-        led.value = 0.75  # 25% brightness for active low
-    else:
-        led.value = 0.25  # 25% brightness for active high
-    
-    print("[WRB] READY - LED at 25% brightness", flush=True)
-    last_scan=time.time()
-
-    while True:
-        # Hot-swap USB/local
-        if time.time()-last_scan > RESCAN_SEC:
-            new_tag, new_base, nB1, nB2, nH1, nH2 = pick_source()
-            if (new_tag != src_tag) or (nB1 != B1) or (nB2 != B2) or (nH1 != H1) or (nH2 != H2):
-                for ch in range(0,15): pygame.mixer.Channel(ch).stop()
-                BUTTON1, BUTTON2, HOLD1, HOLD2 = load_sounds(nB1, nB2, nH1, nH2)
-                src_tag, base, B1, B2, H1, H2 = new_tag, new_base, nB1, nB2, nH1, nH2
-                print(f"[WRB] reloaded: source={src_tag} button1={B1[:1]} button2={len(BUTTON2)} hold1={H1[:1]} hold2={len(HOLD2)}", flush=True)
-            last_scan=time.time()
-
-        try: line=ser.readline().decode(errors="ignore")
-        except Exception: time.sleep(0.05); continue
-        if not line: continue
-            
-        t=classify(line)
-        if t=='B1':
-            if BUTTON1: pygame.mixer.Channel(0).play(BUTTON1)
-            print("[WRB] BUTTON1 (src=%s loaded=%s)"%(src_tag,bool(BUTTON1)), flush=True)
-            try: 
-                # Blink to 100% brightness
-                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
-                time.sleep(0.1)
-                # Return to 25% brightness
-                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
-            except: pass
-        elif t=='B2':
-            if BUTTON2: pygame.mixer.Channel(1).play(random.choice(BUTTON2))
-            print("[WRB] BUTTON2 (src=%s loaded=%d)"%(src_tag,len(BUTTON2)), flush=True)
-            try: 
-                # Blink to 100% brightness
-                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
-                time.sleep(0.1)
-                # Return to 25% brightness
-                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
-            except: pass
-        elif t=='H1':
-            if HOLD1: pygame.mixer.Channel(2).play(HOLD1)
-            print("[WRB] HOLD1 (src=%s loaded=%s)"%(src_tag,bool(HOLD1)), flush=True)
-            try: 
-                # Blink to 100% brightness
-                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
-                time.sleep(0.1)
-                # Return to 25% brightness
-                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
-            except: pass
-        elif t=='H2':
-            if HOLD2: pygame.mixer.Channel(3).play(random.choice(HOLD2))
-            print("[WRB] HOLD2 (src=%s loaded=%d)"%(src_tag,len(HOLD2)), flush=True)
-            try: 
-                # Blink to 100% brightness
-                led.value = 0.0 if READY_ACTIVE_LOW else 1.0
-                time.sleep(0.1)
-                # Return to 25% brightness
-                led.value = 0.75 if READY_ACTIVE_LOW else 0.25
-            except: pass
-
-if __name__=="__main__":
+    # Main loop
     try:
-        main()
+        while True:
+            if ser.in_waiting > 0:
+                try:
+                    data = ser.readline().decode('utf-8').strip()
+                    if data:
+                        print(f"[WRB] Received: {data}")
+                        
+                        # Parse button messages
+                        if "BTN1" in data:
+                            play_sound(sounds, 'button1')
+                        elif "BTN2" in data:
+                            play_sound(sounds, 'button2')
+                        elif "HOLD1" in data:
+                            play_sound(sounds, 'hold1')
+                        elif "HOLD2" in data:
+                            play_sound(sounds, 'hold2')
+                        
+                except Exception as e:
+                    print(f"[WRB] Error reading serial: {e}")
+            
+            time.sleep(0.1)
+            
     except KeyboardInterrupt:
-        print("[WRB] Shutdown requested by user", flush=True)
+        print("\n[WRB] Exiting...")
+        if ser:
+            ser.close()
         sys.exit(0)
-    except Exception as e:
-        print(f"[WRB] Fatal error: {e}", flush=True)
-        # Exit with code 1 to trigger restart (but not if we've restarted too many times)
-        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
