@@ -4,14 +4,14 @@ This guide will help you set up the ESP32 Wireless Button System on a Raspberry 
 
 ## 🚀 Quick Installation
 
-### One-Command Install (Recommended)
+### One-Command Install (Update-1.0 Branch - Recommended)
 ```bash
-curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/Update-1.0/Pi%20Zero/install.sh | bash
 ```
 
-### Clone and Install
+### Clone and Install (Update-1.0 Branch)
 ```bash
-git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
+git clone -b Update-1.0 https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
 cd ~/TheBigWRB/Pi\ Zero
 chmod +x install.sh
 ./install.sh
@@ -19,13 +19,25 @@ chmod +x install.sh
 
 **That's it!** The automated installation script will handle everything else including:
 - System updates and package installation
-- File copying and permissions
+- **Git repository setup with Update-1.0 branch support**
+- **Automatic branch detection and checkout**
+- File copying and permissions from the repository
 - Audio setup and user group configuration
 - Default sound file installation (included with the system)
 - Systemd service installation and startup
 - Automatic error handling (Python environment, audio device access)
 
 **Note**: If you encounter any errors during installation, the script will automatically handle common issues like "externally-managed-environment" and audio device access problems.
+
+## 🌿 Update-1.0 Branch Features
+
+The installation script now includes enhanced Update-1.0 branch support:
+
+- **Automatic Branch Detection**: Tries Update-1.0 branch first, falls back to main if needed
+- **Git Repository Setup**: Creates local repository with proper remote configuration
+- **Smart File Copying**: Copies files from the repository's Pi Zero directory
+- **Branch Information**: Shows which branch was used during installation
+- **Update Commands**: Provides easy update commands for the current branch
 
 Continue reading for detailed manual installation steps if needed.
 
@@ -135,16 +147,16 @@ After cloning the repository, upload the ESP32 code:
 
 ### Step 3: Clone and Install from GitHub
 
-#### 3.1 Clone the Repository
+#### 3.1 Clone the Repository (Update-1.0 Branch)
 ```bash
-# Clone the public repository
-git clone https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
+# Clone the Update-1.0 branch
+git clone -b Update-1.0 https://github.com/Jallison154/TheBigWRB.git ~/TheBigWRB
 
 # Navigate to the project directory
 cd ~/TheBigWRB
 ```
 
-**Note**: This is a public repository, so no authentication is required for cloning.
+**Note**: This installs from the Update-1.0 branch which includes the latest features and improvements.
 
 #### 3.2 Create Working Directory
 ```bash
@@ -412,21 +424,19 @@ Pi Zero/
 
 ## 🔄 Updates and Maintenance
 
-### Updating from GitHub
+### Updating from GitHub (Update-1.0 Branch)
 ```bash
 # Stop service
 sudo systemctl stop WRB-enhanced.service
 
-# Update repository
-cd ~/TheBigWRB
-git pull origin main
+# Update repository (Update-1.0 branch)
+cd ~/WRB
+git pull origin Update-1.0
 
-# Update working files
+# Update working files from repository
 cp "Pi Zero/PiScript" ~/WRB/
 cp "Pi Zero/config.py" ~/WRB/
 cp "Pi Zero/monitor_system.py" ~/WRB/
-cp "Pi Zero/test_esp32_connection.py" ~/WRB/
-cp "Pi Zero/test_system_integration.py" ~/WRB/
 cp "Pi Zero/requirements.txt" ~/WRB/
 
 # Update Python dependencies if needed
@@ -446,18 +456,14 @@ echo "Updating ESP32 Wireless Button System..."
 # Stop service
 sudo systemctl stop WRB-enhanced.service
 
-# Update repository
-cd ~/TheBigWRB
-git pull origin main
+# Update repository (Update-1.0 branch)
+cd ~/WRB
+git pull origin Update-1.0
 
-# Update files
+# Update files from repository
 cp "Pi Zero/PiScript" ~/WRB/
 cp "Pi Zero/config.py" ~/WRB/
 cp "Pi Zero/monitor_system.py" ~/WRB/
-cp "Pi Zero/test_esp32_connection.py" ~/WRB/
-cp "Pi Zero/test_system_integration.py" ~/WRB/
-cp "Pi Zero/test_usb_led.py" ~/WRB/
-cp "Pi Zero/verify_configuration.py" ~/WRB/
 cp "Pi Zero/requirements.txt" ~/WRB/
 
 # Update dependencies
@@ -474,6 +480,36 @@ chmod +x ~/WRB/update_system.sh
 
 # Run updates with:
 # ~/WRB/update_system.sh
+```
+
+### Branch Management
+
+The system now supports automatic branch management:
+
+#### Check Current Branch
+```bash
+cd ~/WRB
+git branch --show-current
+```
+
+#### Switch to Update-1.0 Branch
+```bash
+cd ~/WRB
+git fetch origin Update-1.0
+git checkout Update-1.0
+```
+
+#### Switch to Main Branch
+```bash
+cd ~/WRB
+git fetch origin main
+git checkout main
+```
+
+#### Update Current Branch
+```bash
+cd ~/WRB
+git pull origin $(git branch --show-current)
 ```
 
 ### Log Management
