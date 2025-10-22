@@ -334,6 +334,13 @@ curl -sSL https://raw.githubusercontent.com/Jallison154/TheBigWRB/main/Pi%20Zero
 git clone https://github.com/Jallison154/TheBigWRB.git && cd TheBigWRB/Pi\ Zero && chmod +x install.sh && ./install.sh
 ```
 
+**Manual Install**
+```bash
+# Copy files to Pi and run installation
+scp -r Pi\ Zero/* pi@your-pi-ip:~/WRB/
+ssh pi@your-pi-ip "cd ~/WRB && chmod +x install.sh && ./install.sh"
+```
+
 **Features:**
 - ✅ One-command installation
 - ✅ Default sound files included

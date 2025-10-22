@@ -48,22 +48,10 @@ sudo apt upgrade -y
 echo "📦 Installing required packages..."
 sudo apt install -y python3-pip python3-pygame python3-serial python3-gpiozero sox git alsa-utils python3-venv
 
-# Step 3: Create directory structure and setup git
+# Step 3: Create directory structure
 echo "📁 Creating directory structure..."
 mkdir -p ~/WRB/sounds
-
-# Setup git repository for automatic config updates
-echo "🔧 Setting up git repository for config updates..."
-cd ~/WRB
-if [ ! -d ".git" ]; then
-    git init
-    git remote add origin https://github.com/Jallison154/TheBigWRB.git
-    git config pull.rebase false
-    echo "✅ Git repository initialized"
-else
-    echo "✅ Git repository already exists"
-fi
-# Don't change back to ~ yet - stay in the script directory
+echo "✅ WRB directory structure created"
 
 # Step 4: Copy all files
 echo "📋 Copying application files..."
@@ -80,35 +68,27 @@ ls -la "$SCRIPT_DIR" | grep -E "\.(py|txt)$|PiScript" || echo "No Python files f
 echo "📋 Copying files..."
 FILES_COPIED=0
 
-# Copy PiScript
-if [ -f "$SCRIPT_DIR/PiScript" ]; then
-    cp "$SCRIPT_DIR/PiScript" ~/WRB/ && echo "✅ PiScript copied" && ((FILES_COPIED++))
-else
-    echo "⚠️  PiScript not found in $SCRIPT_DIR"
-fi
+# Essential files that must be copied
+ESSENTIAL_FILES=("PiScript" "config.py")
+OPTIONAL_FILES=("monitor_system.py" "test_esp32_connection.py" "test_system_integration.py" "requirements.txt")
 
-# Copy config.py
-if [ -f "$SCRIPT_DIR/config.py" ]; then
-    cp "$SCRIPT_DIR/config.py" ~/WRB/ && echo "✅ config.py copied" && ((FILES_COPIED++))
-else
-    echo "⚠️  config.py not found in $SCRIPT_DIR"
-fi
-
-# Copy other Python files (optional)
-for file in monitor_system.py test_esp32_connection.py test_system_integration.py; do
+# Copy essential files
+for file in "${ESSENTIAL_FILES[@]}"; do
     if [ -f "$SCRIPT_DIR/$file" ]; then
         cp "$SCRIPT_DIR/$file" ~/WRB/ && echo "✅ $file copied" && ((FILES_COPIED++))
     else
-        echo "⚠️  $file not found in $SCRIPT_DIR"
+        echo "❌ $file not found in $SCRIPT_DIR - THIS IS REQUIRED!"
     fi
 done
 
-# Copy requirements.txt
-if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
-    cp "$SCRIPT_DIR/requirements.txt" ~/WRB/ && echo "✅ requirements.txt copied" && ((FILES_COPIED++))
-else
-    echo "⚠️  requirements.txt not found in $SCRIPT_DIR"
-fi
+# Copy optional files
+for file in "${OPTIONAL_FILES[@]}"; do
+    if [ -f "$SCRIPT_DIR/$file" ]; then
+        cp "$SCRIPT_DIR/$file" ~/WRB/ && echo "✅ $file copied" && ((FILES_COPIED++))
+    else
+        echo "⚠️  $file not found in $SCRIPT_DIR (optional)"
+    fi
+done
 
 # Copy default sound files if they exist
 if [ -d "$SCRIPT_DIR/default_sounds" ]; then
@@ -120,31 +100,34 @@ fi
 
 echo "📊 Files copied: $FILES_COPIED"
 
+# Check if essential files were copied
+if [ ! -f ~/WRB/PiScript ]; then
+    echo "❌ CRITICAL: PiScript not found after copying!"
+    echo "🔍 Current directory contents:"
+    ls -la "$SCRIPT_DIR"
+    echo "🔍 Target directory contents:"
+    ls -la ~/WRB/
+    exit 1
+fi
+
 # Step 5: Set permissions
 echo "🔐 Setting file permissions..."
 
-# Check if essential files were copied successfully
+# If essential files are missing, provide clear error message
 if [ ! -f ~/WRB/PiScript ]; then
-    echo "⚠️  PiScript not found, trying alternative locations..."
-    
-    # Try copying from the TheBigWRB/Pi Zero directory
-    if [ -f ~/TheBigWRB/Pi\ Zero/PiScript ]; then
-        echo "📁 Found files in ~/TheBigWRB/Pi Zero/, copying..."
-        cp ~/TheBigWRB/Pi\ Zero/PiScript ~/WRB/ 2>/dev/null && echo "✅ PiScript copied from TheBigWRB"
-        cp ~/TheBigWRB/Pi\ Zero/config.py ~/WRB/ 2>/dev/null && echo "✅ config.py copied from TheBigWRB"
-        cp ~/TheBigWRB/Pi\ Zero/monitor_system.py ~/WRB/ 2>/dev/null && echo "✅ monitor_system.py copied from TheBigWRB"
-        cp ~/TheBigWRB/Pi\ Zero/test_esp32_connection.py ~/WRB/ 2>/dev/null && echo "✅ test_esp32_connection.py copied from TheBigWRB"
-        cp ~/TheBigWRB/Pi\ Zero/test_system_integration.py ~/WRB/ 2>/dev/null && echo "✅ test_system_integration.py copied from TheBigWRB"
-        cp ~/TheBigWRB/Pi\ Zero/requirements.txt ~/WRB/ 2>/dev/null && echo "✅ requirements.txt copied from TheBigWRB"
-        
-        # Copy default sounds if they exist
-        if [ -d ~/TheBigWRB/Pi\ Zero/default_sounds ]; then
-            cp ~/TheBigWRB/Pi\ Zero/default_sounds/*.wav ~/WRB/sounds/ 2>/dev/null && echo "✅ Default sounds copied from TheBigWRB"
-        fi
-    else
-        echo "❌ PiScript still not found after all attempts"
-        echo "⚠️  Installation will continue, but you may need to manually copy PiScript"
-    fi
+    echo "❌ CRITICAL: Essential files not found!"
+    echo "🔍 Current script directory: $SCRIPT_DIR"
+    echo "🔍 Files in script directory:"
+    ls -la "$SCRIPT_DIR"
+    echo ""
+    echo "🔍 Target directory: ~/WRB/"
+    echo "🔍 Files in target directory:"
+    ls -la ~/WRB/
+    echo ""
+    echo "❌ Installation failed - essential files not found"
+    echo "💡 Make sure you're running the install script from the Pi Zero directory"
+    echo "💡 The script should be located in the same directory as PiScript and config.py"
+    exit 1
 fi
 
 # Set permissions for all files
